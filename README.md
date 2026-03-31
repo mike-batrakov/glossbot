@@ -31,7 +31,20 @@ GlossBot is designed as two components:
 
 This separation keeps webhook handling stateless and makes report generation easy to customize in CI.
 
-## Setup / Installation
+## Current status
+
+GlossBot is public in the open and actively being built, but it is not install-ready yet.
+
+- The v1 design is approved.
+- The public repo foundation is being set up now.
+- The GitHub App and companion Action have not been published yet.
+- Early contributors are welcome, especially on docs, repo hygiene, tests, and implementation scaffolding.
+
+If you are visiting this repository looking for a production-ready GitHub App to install today, check back after the first public implementation milestone lands.
+
+## Planned Setup / Installation
+
+These steps describe the intended install flow after the first public implementation milestone. They are not actionable yet on this branch.
 
 ### 1) Install GlossBot (GitHub App)
 
@@ -83,10 +96,10 @@ Notes:
 - Command matching is case-insensitive.
 - `@gloss track` must appear at the start of a line.
 - Inline or fenced code blocks containing `@gloss track` are ignored.
-- `severity:` accepts: `low`, `medium`, `high`, `critical` (case-insensitive).
-- `tag:` values are case-insensitive and normalized; allowed characters are letters, numbers, `_`, and `-`.
-- Each `tag:` token should be a single value (for example `tag:tech-debt`, `tag:v2`).
-- Invalid `severity:` or `tag:` values cause command validation to fail and GlossBot replies with a user-facing error describing the invalid field.
+- `severity:` accepts: `low`, `medium`, `high`, `critical`.
+- `tag:` values are free-form single tokens and preserve whatever follows `tag:`.
+- Everything after the first colon in a tag is kept, so `tag:v2:experimental` becomes `v2:experimental`.
+- Invalid `severity:` values are surfaced as unrecognized overrides; unknown `key:value` patterns stay in the note text.
 
 ## What gets stored
 
@@ -111,11 +124,27 @@ Concrete `.glosslog` JSON Lines example:
 
 ## Project status
 
-GlossBot is currently in **v1 implementation**.
+GlossBot is currently in **early v1 implementation**.
 
 - ✅ Design approved
-- 🚧 Core implementation in progress
+- 🚧 Public repo foundation in progress
+- 🚧 Core implementation not merged yet
 - 🎯 Scope focused on tracking deferred PR suggestions and generating `GLOSS.md`
+
+## First public implementation milestone
+
+This branch establishes the first public implementation slice:
+
+- A TypeScript/Probot app scaffold under `src/`
+- Initial schema, parser, and GitHub Contents API primitives
+- Tests, CI, contributor setup, and repository templates
+- The foundation for the `.glosslog` schema and `GLOSS.md` generation flow described above
+
+Still to come:
+
+- Full webhook handlers and end-to-end bot behavior
+- The composite GitHub Action implementation under `action/`
+- Install-ready GitHub App configuration and published action release
 
 ## Public roadmap (high-level)
 
@@ -127,7 +156,16 @@ Planned after v1:
 
 ## Contributing
 
-Contributions are welcome. As the core implementation stabilizes, we’ll publish a full contributor setup guide and testing workflow.
+Contributions are welcome.
+
+Right now, the highest-value contributions are:
+
+- documentation clarity
+- public repo setup
+- implementation scaffolding
+- tests and CI once the codebase lands
+
+A fuller contributor setup guide will live in `CONTRIBUTING.md`.
 
 ## License
 
