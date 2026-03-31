@@ -7,6 +7,10 @@ export default (app: Probot): void => {
     await handleInstall(context);
   });
 
+  app.on("installation_repositories.added", async (context) => {
+    await handleInstall(context);
+  });
+
   app.on("pull_request_review_comment.created", async (context) => {
     await handleTrack(context, "pull_request_review_comment");
   });

@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import path from "path";
 import type { Octokit } from "@octokit/rest";
@@ -6,10 +7,19 @@ import { createMetadataLine, isHttpError } from "../schema/entry";
 
 const GLOSSLOG_PATH = ".glosslog";
 const WORKFLOW_PATH = ".github/workflows/glossbot.yml";
-const WORKFLOW_TEMPLATE_PATH = path.resolve(
-  __dirname,
-  "../../templates/glossbot.yml",
-);
+const SETUP_ISSUE_TITLE = "GlossBot setup requires default-branch write access";
+const TEMPLATE_CANDIDATE_PATHS = [
+  path.resolve(__dirname, "../../templates/glossbot.yml"),
+  path.resolve(__dirname, "../templates/glossbot.yml"),
+];
+const PAGE_SIZE = 100;
+
+let workflowTemplatePromise: Promise<string> | null = null;
+
+interface RepositoryRef {
+  name: string;
+  full_name: string;
+}
 
 interface InstallRepository {
   name: string;
@@ -20,77 +30,135 @@ interface InstallRepository {
 
 interface InstallContext {
   payload: {
-    repositories?: Array<{
-      name: string;
-      full_name: string;
-    }>;
+    repositories?: RepositoryRef[];
+    repositories_added?: RepositoryRef[];
   };
   octokit: unknown;
   log: {
     info: (message: string) => void;
+    warn?: (message: string) => void;
     error: (message: string) => void;
   };
 }
 
 export async function handleInstall(context: InstallContext): Promise<void> {
   const octokit = context.octokit as Octokit;
-  const repositories = context.payload.repositories ?? [];
+  const repositories = await loadRepositories(octokit, context.payload);
 
-  for (const repositoryRef of repositories) {
+  for (const repository of repositories) {
     try {
-      const repository = await loadRepository(octokit, repositoryRef);
-      await setupRepository(octokit, repository);
+      const result = await setupRepository(octokit, repository);
+
+      if (result.needsManualSetup) {
+        logWarn(
+          context,
+          `Install flow requires manual setup for ${repository.full_name}`,
+        );
+        continue;
+      }
+
+      if (result.createdPaths.length === 0) {
+        context.log.info(`Install flow already configured for ${repository.full_name}`);
+        continue;
+      }
+
       context.log.info(`Initialized install flow for ${repository.full_name}`);
     } catch (error) {
       context.log.error(
-        `Failed to initialize install flow for ${repositoryRef.full_name}: ${String(error)}`,
+        `Failed to initialize install flow for ${repository.full_name}: ${String(error)}`,
       );
+    }
+  }
+}
+
+async function loadRepositories(
+  octokit: Octokit,
+  payload: InstallContext["payload"],
+): Promise<InstallRepository[]> {
+  const accessibleRepositories = await listAccessibleRepositories(octokit);
+  const requestedRepositories = payload.repositories ?? payload.repositories_added;
+
+  if (requestedRepositories === undefined) {
+    return accessibleRepositories;
+  }
+
+  const accessibleByFullName = new Map(
+    accessibleRepositories.map((repository) => [repository.full_name, repository]),
+  );
+
+  const repositories = await Promise.all(
+    requestedRepositories.map(async (repositoryRef) => {
+      const existing = accessibleByFullName.get(repositoryRef.full_name);
+
+      if (existing !== undefined) {
+        return existing;
+      }
+
+      return loadRepository(octokit, repositoryRef);
+    }),
+  );
+
+  return repositories;
+}
+
+async function listAccessibleRepositories(octokit: Octokit): Promise<InstallRepository[]> {
+  const repositories: InstallRepository[] = [];
+
+  for (let page = 1; ; page += 1) {
+    const response = await octokit.rest.apps.listReposAccessibleToInstallation({
+      page,
+      per_page: PAGE_SIZE,
+    });
+    const pageRepositories = response.data.repositories.map(toInstallRepository);
+
+    repositories.push(...pageRepositories);
+
+    if (pageRepositories.length < PAGE_SIZE) {
+      return repositories;
     }
   }
 }
 
 async function loadRepository(
   octokit: Octokit,
-  repositoryRef: { name: string; full_name: string },
+  repositoryRef: RepositoryRef,
 ): Promise<InstallRepository> {
   const owner = parseOwner(repositoryRef.full_name);
-  const response = await octokit.rest.repos.get({
-    owner,
-    repo: repositoryRef.name,
-  });
-
-  return {
-    name: response.data.name,
-    full_name: response.data.full_name,
-    default_branch: response.data.default_branch,
-    owner: {
-      login: response.data.owner.login,
-    },
-  };
+  const response = await octokit.rest.repos.get({ owner, repo: repositoryRef.name });
+  return toInstallRepository(response.data);
 }
 
 async function setupRepository(
   octokit: Octokit,
   repository: InstallRepository,
-): Promise<void> {
+): Promise<{ createdPaths: string[]; needsManualSetup: boolean }> {
   const owner = repository.owner.login;
   const repo = repository.name;
   const defaultBranch = repository.default_branch;
   const missingPaths: string[] = [];
-
-  if (!(await fileExists(octokit, owner, repo, defaultBranch, GLOSSLOG_PATH))) {
-    missingPaths.push(GLOSSLOG_PATH);
-  }
-
-  if (!(await fileExists(octokit, owner, repo, defaultBranch, WORKFLOW_PATH))) {
-    missingPaths.push(WORKFLOW_PATH);
-  }
-
   const forbiddenPaths: string[] = [];
+
+  for (const filePath of [GLOSSLOG_PATH, WORKFLOW_PATH]) {
+    try {
+      if (!(await fileExists(octokit, owner, repo, defaultBranch, filePath))) {
+        missingPaths.push(filePath);
+      }
+    } catch (error) {
+      if (isHttpError(error) && error.status === 403) {
+        forbiddenPaths.push(filePath);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  const createdPaths: string[] = [];
 
   for (const filePath of missingPaths) {
     try {
       await createMissingFile(octokit, repository, filePath);
+      createdPaths.push(filePath);
     } catch (error) {
       if (isHttpError(error) && error.status === 403) {
         forbiddenPaths.push(filePath);
@@ -103,7 +171,16 @@ async function setupRepository(
 
   if (forbiddenPaths.length > 0) {
     await createSetupIssue(octokit, repository, forbiddenPaths);
+    return {
+      createdPaths,
+      needsManualSetup: true,
+    };
   }
+
+  return {
+    createdPaths,
+    needsManualSetup: false,
+  };
 }
 
 async function createMissingFile(
@@ -145,8 +222,8 @@ async function createMissingFile(
 }
 
 async function renderWorkflowTemplate(defaultBranch: string): Promise<string> {
-  const template = await readFile(WORKFLOW_TEMPLATE_PATH, "utf-8");
-  return template.replace("{{DEFAULT_BRANCH}}", JSON.stringify(defaultBranch));
+  const template = await loadWorkflowTemplate();
+  return template.replace(/{{DEFAULT_BRANCH}}/g, JSON.stringify(defaultBranch));
 }
 
 async function createSetupIssue(
@@ -154,10 +231,26 @@ async function createSetupIssue(
   repository: InstallRepository,
   failedPaths: string[],
 ): Promise<void> {
+  const existingIssues = await octokit.rest.issues.listForRepo({
+    owner: repository.owner.login,
+    repo: repository.name,
+    state: "open",
+    per_page: 100,
+  });
+
+  if (
+    existingIssues.data.some(
+      (issue) =>
+        issue.pull_request === undefined && issue.title === SETUP_ISSUE_TITLE,
+    )
+  ) {
+    return;
+  }
+
   await octokit.rest.issues.create({
     owner: repository.owner.login,
     repo: repository.name,
-    title: "GlossBot setup requires default-branch write access",
+    title: SETUP_ISSUE_TITLE,
     body: buildSetupIssueBody(repository.default_branch, failedPaths),
   });
 }
@@ -190,4 +283,47 @@ function parseOwner(fullName: string): string {
   }
 
   return owner;
+}
+
+function toInstallRepository(repository: {
+  name: string;
+  full_name: string;
+  default_branch: string;
+  owner: { login: string };
+}): InstallRepository {
+  return {
+    name: repository.name,
+    full_name: repository.full_name,
+    default_branch: repository.default_branch,
+    owner: {
+      login: repository.owner.login,
+    },
+  };
+}
+
+async function loadWorkflowTemplate(): Promise<string> {
+  if (workflowTemplatePromise !== null) {
+    return workflowTemplatePromise;
+  }
+
+  workflowTemplatePromise = (async () => {
+    for (const templatePath of TEMPLATE_CANDIDATE_PATHS) {
+      if (existsSync(templatePath)) {
+        return readFile(templatePath, "utf-8");
+      }
+    }
+
+    throw new Error("GlossBot workflow template is missing from the runtime artifact.");
+  })();
+
+  return workflowTemplatePromise;
+}
+
+function logWarn(context: InstallContext, message: string): void {
+  if (context.log.warn !== undefined) {
+    context.log.warn(message);
+    return;
+  }
+
+  context.log.info(message);
 }

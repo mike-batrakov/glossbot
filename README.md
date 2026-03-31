@@ -57,7 +57,7 @@ After install, mention `@gloss track` in a PR comment to verify GlossBot is acti
 
 ### 2) Add the companion GitHub Action
 
-Create a workflow file at `.github/workflows/gloss.yml` in the target repository that uses the companion GitHub Action `glossbot/generate-gloss-md@v1`.
+Create a workflow file at `.github/workflows/glossbot.yml` in the target repository that uses the companion GitHub Action `glossbot/generate-gloss-md@v1`.
 
 Typical behavior:
 

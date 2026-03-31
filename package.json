@@ -4,7 +4,7 @@
   "description": "Track deferred code suggestions and tech debt directly from pull request comments.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/templates', { recursive: true }); fs.copyFileSync('templates/glossbot.yml', 'dist/templates/glossbot.yml');\"",
     "build:action": "node -e \"const fs=require('fs'); const cp=require('child_process'); if (!fs.existsSync('action/generate.ts')) { console.log('Skipping action build: no action source yet'); process.exit(0); } cp.execSync('tsc -p tsconfig.action.json', { stdio: 'inherit' });\"",
     "start": "probot run ./dist/index.js",
     "dev": "tsx ./node_modules/probot/bin/probot.js run ./src/index.ts",
