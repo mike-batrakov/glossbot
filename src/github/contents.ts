@@ -1,4 +1,4 @@
-import type { Octokit } from "@octokit/rest";
+import type { GitHubClient } from "./client";
 import { createMetadataLine, isHttpError } from "../schema/entry";
 
 const GLOSSLOG_PATH = ".glosslog";
@@ -22,7 +22,7 @@ function isFileContentPayload(data: unknown): data is { content: string; sha: st
 }
 
 export async function readGlosslog(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   ref: string,
@@ -53,7 +53,7 @@ export async function readGlosslog(
 }
 
 export async function appendToGlosslog(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   defaultBranch: string,
@@ -97,7 +97,7 @@ export async function appendToGlosslog(
 }
 
 export async function createFile(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   defaultBranch: string,
@@ -116,7 +116,7 @@ export async function createFile(
 }
 
 export async function fileExists(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   ref: string,

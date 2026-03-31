@@ -73,6 +73,67 @@ describe("extractContext", () => {
     expect(ctx.prAuthorLogin).toBe("author");
   });
 
+  it("preserves multi-line review comment ranges", async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          getReviewComment: vi.fn().mockResolvedValue({
+            data: {
+              body: "Split this helper into two focused functions",
+              user: { login: "reviewer", type: "User" },
+              html_url: "https://github.com/o/r/pull/1#discussion_r101",
+              path: "src/cache.ts",
+              start_line: 8,
+              original_start_line: 8,
+              line: 12,
+              original_line: 12,
+              original_commit_id: "abc124",
+            },
+          }),
+        },
+      },
+    };
+    const payload = {
+      comment: {
+        id: 201,
+        body: "@gloss track",
+        user: { login: "mbatrakov", type: "User" },
+        in_reply_to_id: 101,
+        path: "src/cache.ts",
+        line: 12,
+        original_line: 12,
+        original_commit_id: "abc124",
+        html_url: "https://github.com/o/r/pull/1#discussion_r201",
+      },
+      pull_request: {
+        number: 1,
+        title: "Add cache",
+        html_url: "https://github.com/o/r/pull/1",
+        user: { login: "author" },
+      },
+      repository: {
+        owner: { login: "o" },
+        name: "r",
+        full_name: "o/r",
+        default_branch: "main",
+      },
+    };
+
+    const ctx = await extractContext(
+      octokit as never,
+      "pull_request_review_comment",
+      payload,
+    );
+
+    expect(ctx.type).toBe("structured");
+    expect(ctx.location).toEqual({
+      path: "src/cache.ts",
+      start_line: 8,
+      end_line: 12,
+      original_commit_sha: "abc124",
+    });
+  });
+
   it("creates freeform context from a standalone issue comment", async () => {
     const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
     const payload = {
@@ -291,6 +352,37 @@ describe("extractContext", () => {
     await expect(
       extractContext(octokit as never, "issue_comment", payload, prData),
     ).rejects.toEqual({ status: 500 });
+  });
+
+  it("throws when the comment user login is unavailable", async () => {
+    const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
+    const payload = {
+      comment: {
+        id: 600,
+        body: "@gloss track refactor auth module",
+        user: null,
+        html_url: "https://github.com/o/r/pull/1#issuecomment-600",
+      },
+      issue: {
+        number: 1,
+        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
+      },
+      repository: {
+        owner: { login: "o" },
+        name: "r",
+        full_name: "o/r",
+        default_branch: "main",
+      },
+    };
+    const prData = {
+      title: "Auth changes",
+      html_url: "https://github.com/o/r/pull/1",
+      user: { login: "author" },
+    };
+
+    await expect(
+      extractContext(octokit as never, "issue_comment", payload, prData),
+    ).rejects.toThrow("Could not determine user login for comment.");
   });
 });
 

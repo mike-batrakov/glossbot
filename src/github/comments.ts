@@ -1,4 +1,4 @@
-import type { Octokit } from "@octokit/rest";
+import type { GitHubClient } from "./client";
 import { suggestSeverity } from "../parser/levenshtein";
 import type { InvalidOverride } from "../parser/command";
 import type { EntryType, Severity } from "../schema/entry";
@@ -51,7 +51,7 @@ export function formatReply(input: ReplyInput): string {
 }
 
 export async function postReply(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   issueNumber: number,

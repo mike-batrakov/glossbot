@@ -1,7 +1,13 @@
-import type { Octokit } from "@octokit/rest";
+import type { GitHubClient } from "../github/client";
 import { appendToGlosslog } from "../github/contents";
 import { formatReply, postReply } from "../github/comments";
-import { extractContext, inferSeverity } from "../github/context";
+import {
+  extractContext,
+  inferSeverity,
+  type IssueCommentEventPayload,
+  type PullRequestData,
+  type PullRequestReviewCommentEventPayload,
+} from "../github/context";
 import { parseCommand } from "../parser/command";
 import {
   createEntry,
@@ -28,15 +34,9 @@ interface TrackPayload {
   };
 }
 
-interface PullSummary {
-  title: string;
-  html_url: string;
-  user: { login: string };
-}
-
 interface TrackContext {
   payload: TrackPayload;
-  octokit: unknown;
+  octokit: GitHubClient;
   log: {
     info: (message: string) => void;
     error: (message: string) => void;
@@ -56,20 +56,22 @@ export async function handleTrack(
   const owner = context.payload.repository.owner.login;
   const repo = context.payload.repository.name;
   const issueNumber = getIssueNumber(context.payload, eventName);
-  const octokit = context.octokit as Octokit;
+  const octokit = context.octokit;
 
   try {
-    const prData =
+    const extracted =
       eventName === "issue_comment"
-        ? await loadPullRequest(octokit, owner, repo, issueNumber)
-        : undefined;
-
-    const extracted = await extractContext(
-      octokit,
-      eventName,
-      context.payload,
-      prData,
-    );
+        ? await extractContext(
+            octokit,
+            "issue_comment",
+            context.payload as IssueCommentEventPayload,
+            await loadPullRequest(octokit, owner, repo, issueNumber),
+          )
+        : await extractContext(
+            octokit,
+            "pull_request_review_comment",
+            context.payload as PullRequestReviewCommentEventPayload,
+          );
     const suggestion = resolveSuggestion(
       extracted.usesOwnCommentAsSuggestion,
       extracted.suggestion,
@@ -162,11 +164,11 @@ function getIssueNumber(
 }
 
 async function loadPullRequest(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   issueNumber: number,
-): Promise<PullSummary> {
+): Promise<PullRequestData> {
   const response = await octokit.rest.pulls.get({
     owner,
     repo,

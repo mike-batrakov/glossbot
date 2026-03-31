@@ -1,4 +1,4 @@
-import type { Octokit } from "@octokit/rest";
+import type { GitHubClient } from "./client";
 import { isHttpError } from "../schema/entry";
 import type {
   AuthorType,
@@ -30,12 +30,14 @@ interface CommonCommentPayload {
 
 interface ReviewCommentPayload extends CommonCommentPayload {
   path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
   line: number | null;
   original_line: number | null;
   original_commit_id: string;
 }
 
-interface PullRequestData {
+export interface PullRequestData {
   title: string;
   html_url: string;
   user: { login: string };
@@ -45,13 +47,13 @@ interface ReviewEventPullRequestData extends PullRequestData {
   number: number;
 }
 
-interface PullRequestReviewCommentEventPayload {
+export interface PullRequestReviewCommentEventPayload {
   repository: RepositoryPayload;
   comment: ReviewCommentPayload;
   pull_request: ReviewEventPullRequestData;
 }
 
-interface IssueCommentEventPayload {
+export interface IssueCommentEventPayload {
   repository: RepositoryPayload;
   comment: CommonCommentPayload;
   issue: {
@@ -65,6 +67,8 @@ interface ReviewCommentApiResponse {
   user: CommentUser | null;
   html_url: string;
   path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
   line: number | null;
   original_line: number | null;
   original_commit_id: string;
@@ -82,28 +86,32 @@ export interface ExtractedContext {
   usesOwnCommentAsSuggestion: boolean;
 }
 
+export function extractContext(
+  octokit: GitHubClient,
+  eventName: "pull_request_review_comment",
+  payload: PullRequestReviewCommentEventPayload,
+): Promise<ExtractedContext>;
+export function extractContext(
+  octokit: GitHubClient,
+  eventName: "issue_comment",
+  payload: IssueCommentEventPayload,
+  prData: PullRequestData,
+): Promise<ExtractedContext>;
 export async function extractContext(
-  octokit: Octokit,
+  octokit: GitHubClient,
   eventName: "pull_request_review_comment" | "issue_comment",
-  payload: unknown,
+  payload: PullRequestReviewCommentEventPayload | IssueCommentEventPayload,
   prData?: PullRequestData,
 ): Promise<ExtractedContext> {
   if (eventName === "pull_request_review_comment") {
-    return extractFromReviewComment(
-      octokit,
-      payload as PullRequestReviewCommentEventPayload,
-    );
+    return extractFromReviewComment(octokit, payload as PullRequestReviewCommentEventPayload);
   }
 
-  return extractFromIssueComment(
-    octokit,
-    payload as IssueCommentEventPayload,
-    prData as PullRequestData,
-  );
+  return extractFromIssueComment(octokit, payload as IssueCommentEventPayload, prData as PullRequestData);
 }
 
 async function extractFromReviewComment(
-  octokit: Octokit,
+  octokit: GitHubClient,
   payload: PullRequestReviewCommentEventPayload,
 ): Promise<ExtractedContext> {
   const repository = payload.repository;
@@ -160,7 +168,7 @@ async function extractFromReviewComment(
 }
 
 async function extractFromIssueComment(
-  octokit: Octokit,
+  octokit: GitHubClient,
   payload: IssueCommentEventPayload,
   prData: PullRequestData,
 ): Promise<ExtractedContext> {
@@ -216,7 +224,7 @@ async function extractFromIssueComment(
 }
 
 async function fetchParentComment(
-  octokit: Octokit,
+  octokit: GitHubClient,
   owner: string,
   repo: string,
   commentId: number,
@@ -249,20 +257,25 @@ function buildSuggestion(comment: ReviewCommentApiResponse): GlossSuggestion {
 
 function buildLocation(comment: {
   path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
   line: number | null;
   original_line: number | null;
   original_commit_id: string;
 }): GlossLocation | null {
-  const line = comment.original_line ?? comment.line;
+  const endLine = comment.original_line ?? comment.line;
 
-  if (line === null) {
+  if (endLine === null) {
     return null;
   }
 
+  const startLine =
+    comment.original_start_line ?? comment.start_line ?? endLine;
+
   return {
     path: comment.path,
-    start_line: line,
-    end_line: line,
+    start_line: startLine,
+    end_line: endLine,
     original_commit_sha: comment.original_commit_id,
   };
 }
@@ -272,7 +285,11 @@ function detectAuthorType(userType: string | undefined): AuthorType {
 }
 
 function getUserLogin(user: CommentUser | null): string {
-  return user?.login ?? "";
+  if (!user?.login) {
+    throw new Error("Could not determine user login for comment.");
+  }
+
+  return user.login;
 }
 
 function stripCommandPrefix(body: string): string {
