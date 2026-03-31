@@ -148,6 +148,35 @@ describe("appendToGlosslog", () => {
     expect(decoded).toBe(metadataLine + "\n" + newLine + "\n");
   });
 
+  it("creates a new file with generated metadata when none is provided", async () => {
+    const octokit = createMockOctokit();
+    octokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
+    octokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({});
+
+    const newLine = '{"_type":"entry","id":"g_12345678"}';
+
+    await appendToGlosslog(
+      octokit as never,
+      "owner",
+      "repo",
+      "main",
+      newLine,
+      "gloss: track g_12345678",
+    );
+
+    const putCall = octokit.rest.repos.createOrUpdateFileContents.mock.calls[0][0];
+    const decoded = Buffer.from(putCall.content, "base64").toString("utf-8");
+    const [metadata, entry, trailing] = decoded.split("\n");
+
+    expect(JSON.parse(metadata)).toMatchObject({
+      _type: "glosslog",
+      version: 1,
+      repo: "owner/repo",
+    });
+    expect(entry).toBe(newLine);
+    expect(trailing).toBe("");
+  });
+
   it("retries on 409 conflict", async () => {
     const octokit = createMockOctokit();
     const content = '{"_type":"glosslog"}\n';

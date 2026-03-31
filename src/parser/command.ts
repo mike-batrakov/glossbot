@@ -15,7 +15,7 @@ export interface ParseResult {
 const COMMAND_PATTERN = /^\s*@gloss\s+track\b/i;
 
 export function parseCommand(body: string): ParseResult | null {
-  const lines = body.split("\n");
+  const lines = body.split(/\r?\n/);
   let insideFence = false;
 
   for (let index = 0; index < lines.length; index += 1) {

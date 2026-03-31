@@ -1,5 +1,5 @@
 import type { Octokit } from "@octokit/rest";
-import { isHttpError } from "../schema/entry";
+import { createMetadataLine, isHttpError } from "../schema/entry";
 
 const GLOSSLOG_PATH = ".glosslog";
 const MAX_PUT_ATTEMPTS = 3;
@@ -64,7 +64,9 @@ export async function appendToGlosslog(
   for (let attempt = 0; attempt < MAX_PUT_ATTEMPTS; attempt += 1) {
     try {
       const existing = await readGlosslog(octokit, owner, repo, defaultBranch);
-      let nextContent = existing ? existing.content : metadataLine ?? "";
+      let nextContent = existing
+        ? existing.content
+        : metadataLine ?? createMetadataLine(`${owner}/${repo}`);
 
       if (nextContent && !nextContent.endsWith("\n")) {
         nextContent += "\n";

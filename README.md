@@ -42,7 +42,9 @@ GlossBot is public in the open and actively being built, but it is not install-r
 
 If you are visiting this repository looking for a production-ready GitHub App to install today, check back after the first public implementation milestone lands.
 
-## Setup / Installation
+## Planned Setup / Installation
+
+These steps describe the intended install flow after the first public implementation milestone. They are not actionable yet on this branch.
 
 ### 1) Install GlossBot (GitHub App)
 

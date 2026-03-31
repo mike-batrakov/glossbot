@@ -24,6 +24,12 @@ describe("parseCommand", () => {
       expect(result?.severity).toBe("high");
     });
 
+    it("detects command in CRLF-delimited text", () => {
+      const result = parseCommand("I agree\r\n@gloss track severity:high");
+      expect(result).not.toBeNull();
+      expect(result?.severity).toBe("high");
+    });
+
     it("returns null for mid-sentence", () => {
       const result = parseCommand("I agree with this, @gloss track");
       expect(result).toBeNull();

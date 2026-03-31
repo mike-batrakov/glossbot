@@ -30,7 +30,7 @@ Once the application scaffold is present, the expected local workflow is:
 npm install
 npm run typecheck
 npm run lint
-npm test
+npm run test:coverage
 ```
 
 If a task introduces or changes GitHub Action code, also run:
