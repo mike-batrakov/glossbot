@@ -139,6 +139,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .claude/
+.worktrees/
 docs/superpowers/
 CLAUDE.md
 

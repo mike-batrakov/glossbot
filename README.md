@@ -31,6 +31,17 @@ GlossBot is designed as two components:
 
 This separation keeps webhook handling stateless and makes report generation easy to customize in CI.
 
+## Current status
+
+GlossBot is public in the open and actively being built, but it is not install-ready yet.
+
+- The v1 design is approved.
+- The public repo foundation is being set up now.
+- The GitHub App and companion Action have not been published yet.
+- Early contributors are welcome, especially on docs, repo hygiene, tests, and implementation scaffolding.
+
+If you are visiting this repository looking for a production-ready GitHub App to install today, check back after the first public implementation milestone lands.
+
 ## Setup / Installation
 
 ### 1) Install GlossBot (GitHub App)
@@ -111,11 +122,27 @@ Concrete `.glosslog` JSON Lines example:
 
 ## Project status
 
-GlossBot is currently in **v1 implementation**.
+GlossBot is currently in **early v1 implementation**.
 
 - ✅ Design approved
-- 🚧 Core implementation in progress
+- 🚧 Public repo foundation in progress
+- 🚧 Core implementation not merged yet
 - 🎯 Scope focused on tracking deferred PR suggestions and generating `GLOSS.md`
+
+## First public implementation milestone
+
+This branch establishes the first public implementation slice:
+
+- A TypeScript/Probot app scaffold under `src/`
+- Initial schema, parser, and GitHub Contents API primitives
+- Tests, CI, contributor setup, and repository templates
+- The foundation for the `.glosslog` schema and `GLOSS.md` generation flow described above
+
+Still to come:
+
+- Full webhook handlers and end-to-end bot behavior
+- The composite GitHub Action implementation under `action/`
+- Install-ready GitHub App configuration and published action release
 
 ## Public roadmap (high-level)
 
@@ -127,7 +154,16 @@ Planned after v1:
 
 ## Contributing
 
-Contributions are welcome. As the core implementation stabilizes, we’ll publish a full contributor setup guide and testing workflow.
+Contributions are welcome.
+
+Right now, the highest-value contributions are:
+
+- documentation clarity
+- public repo setup
+- implementation scaffolding
+- tests and CI once the codebase lands
+
+A fuller contributor setup guide will live in `CONTRIBUTING.md`.
 
 ## License
 

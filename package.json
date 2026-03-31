@@ -1,0 +1,43 @@
+{
+  "name": "glossbot",
+  "version": "0.1.0",
+  "description": "Track deferred code suggestions and tech debt directly from pull request comments.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:action": "node -e \"const fs=require('fs'); const cp=require('child_process'); if (!fs.existsSync('action/generate.ts')) { console.log('Skipping action build: no action source yet'); process.exit(0); } cp.execSync('tsc -p tsconfig.action.json', { stdio: 'inherit' });\"",
+    "start": "probot run ./dist/index.js",
+    "dev": "tsx ./node_modules/probot/bin/probot.js run ./src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src test --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github-app",
+    "probot",
+    "tech-debt",
+    "code-review"
+  ],
+  "author": "Michael Batrakov",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "probot": "^14.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "eslint": "^8.57.1",
+    "nock": "^14.0.11",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}

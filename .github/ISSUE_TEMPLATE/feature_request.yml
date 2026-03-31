@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new feature or improvement for GlossBot.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+        
+        Please focus on the user problem first, then the proposed solution.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      placeholder: Describe the workflow pain or missing capability.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: Describe the change you want to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Describe any alternative ideas or workarounds.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - GitHub App behavior
+        - GLOSS.md generation / Action
+        - Developer experience / docs
+        - CI / testing / repo tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      placeholder: Links, examples, screenshots, or related issues.
