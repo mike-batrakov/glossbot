@@ -31,21 +31,62 @@ GlossBot is designed as two components:
 
 This separation keeps webhook handling stateless and makes report generation easy to customize in CI.
 
+## Setup / Installation
+
+### 1) Install GlossBot (GitHub App)
+
+1. Open the GlossBot GitHub App page and click **Install**.
+2. Choose your account or organization.
+3. Select repositories (single repo or all repos) and confirm installation.
+4. Ensure the app is granted repository access where you plan to use `@gloss track`.
+
+After install, mention `@gloss track` in a PR comment to verify GlossBot is active.
+
+### 2) Add the companion GitHub Action
+
+Create a workflow file at `.github/workflows/gloss.yml` in the target repository that uses the companion GitHub Action `glossbot/generate-gloss-md@v1`.
+
+Typical behavior:
+
+- Trigger when `.glosslog` is updated on the default branch.
+- Read `.glosslog` entries with status `open`.
+- Regenerate `GLOSS.md`.
+- Commit updated `GLOSS.md` back to the repository.
+
+### 3) Required permissions and secrets
+
+- **GlossBot (GitHub App):** needs repository permissions to read PR comments/metadata and write `.glosslog` via the Contents API.
+- **companion GitHub Action:** needs `contents: write` permission so it can update `GLOSS.md`.
+- **Secrets / env vars:**
+  - For standard usage of `glossbot/generate-gloss-md@v1`, no additional repository secrets are required beyond the default workflow token.
+  - Self-hosted GlossBot deployments may require app credentials (for example App ID, private key, and webhook secret) managed as environment variables/secrets in the deployment platform.
+
+### 4) Quick verification after setup
+
+1. Add a PR comment starting with `@gloss track`.
+2. Confirm GlossBot replies with an entry ID.
+3. Confirm `.glosslog` receives a new JSONL entry.
+4. Confirm the companion GitHub Action runs and updates `GLOSS.md`.
+
 ## Command quick reference
 
 Supported command forms:
 
 - `@gloss track`
 - `@gloss track severity:high`
-- `@gloss track tag:v2 tag:backlog`
+- `@gloss track severity:critical tag:v2 tag:backlog`
 - `@gloss track severity:high tag:security`
-- `@gloss track severity:high follow up before launch`
+- `@gloss track severity:medium follow up before launch`
 
 Notes:
 
 - Command matching is case-insensitive.
 - `@gloss track` must appear at the start of a line.
 - Inline or fenced code blocks containing `@gloss track` are ignored.
+- `severity:` accepts: `low`, `medium`, `high`, `critical` (case-insensitive).
+- `tag:` values are case-insensitive and normalized; allowed characters are letters, numbers, `_`, and `-`.
+- Each `tag:` token should be a single value (for example `tag:tech-debt`, `tag:v2`).
+- Invalid `severity:` or `tag:` values cause command validation to fail and GlossBot replies with a user-facing error describing the invalid field.
 
 ## What gets stored
 
@@ -55,9 +96,18 @@ GlossBot writes to `.glosslog` (JSON Lines format):
 - Entry lines (`_type: "entry"`) with:
   - suggestion text and permalink
   - PR metadata
-  - optional file/line context (for structured comments)
+  - optional file/line context (for structured comments: GitHub review comments that carry file and line metadata)
+    - Structured comments here means GitHub-style PR **review comments** (line/file anchored), not generic PR conversation comments.
+    - GlossBot extracts this from webhook payload metadata (for example fields equivalent to `path`/`filePath` and `line`/`lineNumber`) and stores it as optional location context when present.
   - severity, tags, note
   - status (`open` in v1)
+
+Concrete `.glosslog` JSON Lines example:
+
+```json
+{"_type":"glosslog","version":1,"repo":"octo-org/example-repo","initialized_at":"2026-03-31T14:05:00Z"}
+{"_type":"entry","id":"g_a1b2c3","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-03-31T14:22:00Z","source":"github-pr","suggestion":{"body":"Use parameterized query instead of string concat.","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/42#discussion_r123456789"},"location":{"path":"src/db/query.ts","start_line":34,"end_line":34,"original_commit_sha":"abc1234"},"pr":{"number":42,"title":"Add user search","url":"https://github.com/octo-org/example-repo/pull/42"},"deferred_by":"mbatrakov","severity":"high","tags":["security","sql"],"note":null,"status":"open"}
+```
 
 ## Project status
 
