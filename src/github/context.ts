@@ -1,0 +1,310 @@
+import type { GitHubClient } from "./client";
+import { isHttpError } from "../schema/entry";
+import type {
+  AuthorType,
+  EntryType,
+  GlossLocation,
+  GlossPr,
+  GlossSuggestion,
+  Severity,
+} from "../schema/entry";
+
+interface RepositoryPayload {
+  owner: { login: string };
+  name: string;
+  full_name: string;
+  default_branch: string;
+}
+
+interface CommentUser {
+  login: string;
+  type: string;
+}
+
+interface CommonCommentPayload {
+  body: string;
+  user: CommentUser | null;
+  html_url: string;
+  in_reply_to_id?: number;
+}
+
+interface ReviewCommentPayload extends CommonCommentPayload {
+  path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
+  line: number | null;
+  original_line: number | null;
+  original_commit_id: string;
+}
+
+export interface PullRequestData {
+  title: string;
+  html_url: string;
+  user: { login: string };
+}
+
+interface ReviewEventPullRequestData extends PullRequestData {
+  number: number;
+}
+
+export interface PullRequestReviewCommentEventPayload {
+  repository: RepositoryPayload;
+  comment: ReviewCommentPayload;
+  pull_request: ReviewEventPullRequestData;
+}
+
+export interface IssueCommentEventPayload {
+  repository: RepositoryPayload;
+  comment: CommonCommentPayload;
+  issue: {
+    number: number;
+    pull_request: { url: string };
+  };
+}
+
+interface ReviewCommentApiResponse {
+  body: string;
+  user: CommentUser | null;
+  html_url: string;
+  path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
+  line: number | null;
+  original_line: number | null;
+  original_commit_id: string;
+}
+
+export interface ExtractedContext {
+  type: EntryType;
+  repo: string;
+  defaultBranch: string;
+  suggestion: GlossSuggestion;
+  location: GlossLocation | null;
+  pr: GlossPr;
+  deferred_by: string;
+  prAuthorLogin: string;
+  usesOwnCommentAsSuggestion: boolean;
+}
+
+export function extractContext(
+  octokit: GitHubClient,
+  eventName: "pull_request_review_comment",
+  payload: PullRequestReviewCommentEventPayload,
+): Promise<ExtractedContext>;
+export function extractContext(
+  octokit: GitHubClient,
+  eventName: "issue_comment",
+  payload: IssueCommentEventPayload,
+  prData: PullRequestData,
+): Promise<ExtractedContext>;
+export async function extractContext(
+  octokit: GitHubClient,
+  eventName: "pull_request_review_comment" | "issue_comment",
+  payload: PullRequestReviewCommentEventPayload | IssueCommentEventPayload,
+  prData?: PullRequestData,
+): Promise<ExtractedContext> {
+  if (eventName === "pull_request_review_comment") {
+    return extractFromReviewComment(octokit, payload as PullRequestReviewCommentEventPayload);
+  }
+
+  return extractFromIssueComment(octokit, payload as IssueCommentEventPayload, prData as PullRequestData);
+}
+
+async function extractFromReviewComment(
+  octokit: GitHubClient,
+  payload: PullRequestReviewCommentEventPayload,
+): Promise<ExtractedContext> {
+  const repository = payload.repository;
+  const comment = payload.comment;
+  const pr: GlossPr = {
+    number: payload.pull_request.number,
+    title: payload.pull_request.title,
+    url: payload.pull_request.html_url,
+  };
+
+  if (comment.in_reply_to_id !== undefined) {
+    const parent = await fetchParentComment(
+      octokit,
+      repository.owner.login,
+      repository.name,
+      comment.in_reply_to_id,
+    );
+
+    if (parent !== null) {
+      const location = buildLocation(parent);
+
+      return {
+        type: location === null ? "freeform" : "structured",
+        repo: repository.full_name,
+        defaultBranch: repository.default_branch,
+        suggestion: buildSuggestion(parent),
+        location,
+        pr,
+        deferred_by: getUserLogin(comment.user),
+        prAuthorLogin: payload.pull_request.user.login,
+        usesOwnCommentAsSuggestion: false,
+      };
+    }
+  }
+
+  const location = buildLocation(comment);
+
+  return {
+    type: location === null ? "freeform" : "structured",
+    repo: repository.full_name,
+    defaultBranch: repository.default_branch,
+    suggestion: {
+      body: stripCommandPrefix(comment.body),
+      author: getUserLogin(comment.user),
+      author_type: detectAuthorType(comment.user?.type),
+      url: comment.html_url,
+    },
+    location,
+    pr,
+    deferred_by: getUserLogin(comment.user),
+    prAuthorLogin: payload.pull_request.user.login,
+    usesOwnCommentAsSuggestion: true,
+  };
+}
+
+async function extractFromIssueComment(
+  octokit: GitHubClient,
+  payload: IssueCommentEventPayload,
+  prData: PullRequestData,
+): Promise<ExtractedContext> {
+  const repository = payload.repository;
+  const comment = payload.comment;
+  const pr: GlossPr = {
+    number: payload.issue.number,
+    title: prData.title,
+    url: prData.html_url,
+  };
+
+  if (comment.in_reply_to_id !== undefined) {
+    const parent = await fetchParentComment(
+      octokit,
+      repository.owner.login,
+      repository.name,
+      comment.in_reply_to_id,
+    );
+
+    if (parent !== null) {
+      const location = buildLocation(parent);
+
+      return {
+        type: location === null ? "freeform" : "structured",
+        repo: repository.full_name,
+        defaultBranch: repository.default_branch,
+        suggestion: buildSuggestion(parent),
+        location,
+        pr,
+        deferred_by: getUserLogin(comment.user),
+        prAuthorLogin: prData.user.login,
+        usesOwnCommentAsSuggestion: false,
+      };
+    }
+  }
+
+  return {
+    type: "freeform",
+    repo: repository.full_name,
+    defaultBranch: repository.default_branch,
+    suggestion: {
+      body: stripCommandPrefix(comment.body),
+      author: getUserLogin(comment.user),
+      author_type: detectAuthorType(comment.user?.type),
+      url: comment.html_url,
+    },
+    location: null,
+    pr,
+    deferred_by: getUserLogin(comment.user),
+    prAuthorLogin: prData.user.login,
+    usesOwnCommentAsSuggestion: true,
+  };
+}
+
+async function fetchParentComment(
+  octokit: GitHubClient,
+  owner: string,
+  repo: string,
+  commentId: number,
+): Promise<ReviewCommentApiResponse | null> {
+  try {
+    const response = await octokit.rest.pulls.getReviewComment({
+      owner,
+      repo,
+      comment_id: commentId,
+    });
+
+    return response.data as ReviewCommentApiResponse;
+  } catch (error) {
+    if (isHttpError(error) && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function buildSuggestion(comment: ReviewCommentApiResponse): GlossSuggestion {
+  return {
+    body: comment.body,
+    author: getUserLogin(comment.user),
+    author_type: detectAuthorType(comment.user?.type),
+    url: comment.html_url,
+  };
+}
+
+function buildLocation(comment: {
+  path: string;
+  start_line?: number | null;
+  original_start_line?: number | null;
+  line: number | null;
+  original_line: number | null;
+  original_commit_id: string;
+}): GlossLocation | null {
+  const endLine = comment.original_line ?? comment.line;
+
+  if (endLine === null) {
+    return null;
+  }
+
+  const startLine =
+    comment.original_start_line ?? comment.start_line ?? endLine;
+
+  return {
+    path: comment.path,
+    start_line: startLine,
+    end_line: endLine,
+    original_commit_sha: comment.original_commit_id,
+  };
+}
+
+function detectAuthorType(userType: string | undefined): AuthorType {
+  return userType === "Bot" ? "bot" : "human";
+}
+
+function getUserLogin(user: CommentUser | null): string {
+  if (!user?.login) {
+    throw new Error("Could not determine user login for comment.");
+  }
+
+  return user.login;
+}
+
+function stripCommandPrefix(body: string): string {
+  const stripped = body.replace(/^\s*@gloss\s+track\b\s*/i, "").trim();
+  return stripped.length > 0 ? stripped : body;
+}
+
+export function inferSeverity(
+  authorType: AuthorType,
+  suggestionAuthor: string,
+  prAuthorLogin: string,
+): Severity {
+  if (authorType === "bot") {
+    return "medium";
+  }
+
+  return suggestionAuthor === prAuthorLogin ? "low" : "high";
+}
