@@ -1,0 +1,19 @@
+name: GlossBot
+
+on:
+  push:
+    branches:
+      - {{DEFAULT_BRANCH}}
+    paths:
+      - ".glosslog"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-gloss:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: glossbot/generate-gloss-md@v1

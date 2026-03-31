@@ -1,7 +1,16 @@
 import { Probot } from "probot";
+import { handleInstall } from "./handlers/install";
 import { handleTrack } from "./handlers/track";
 
 export default (app: Probot): void => {
+  app.on("installation.created", async (context) => {
+    await handleInstall(context);
+  });
+
+  app.on("installation_repositories.added", async (context) => {
+    await handleInstall(context);
+  });
+
   app.on("pull_request_review_comment.created", async (context) => {
     await handleTrack(context, "pull_request_review_comment");
   });
