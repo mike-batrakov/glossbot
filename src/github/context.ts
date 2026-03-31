@@ -123,12 +123,14 @@ async function extractFromReviewComment(
     );
 
     if (parent !== null) {
+      const location = buildLocation(parent);
+
       return {
-        type: "structured",
+        type: location === null ? "freeform" : "structured",
         repo: repository.full_name,
         defaultBranch: repository.default_branch,
         suggestion: buildSuggestion(parent),
-        location: buildLocation(parent),
+        location,
         pr,
         deferred_by: getUserLogin(comment.user),
         prAuthorLogin: payload.pull_request.user.login,
@@ -137,8 +139,10 @@ async function extractFromReviewComment(
     }
   }
 
+  const location = buildLocation(comment);
+
   return {
-    type: "structured",
+    type: location === null ? "freeform" : "structured",
     repo: repository.full_name,
     defaultBranch: repository.default_branch,
     suggestion: {
@@ -147,7 +151,7 @@ async function extractFromReviewComment(
       author_type: detectAuthorType(comment.user?.type),
       url: comment.html_url,
     },
-    location: buildLocation(comment),
+    location,
     pr,
     deferred_by: getUserLogin(comment.user),
     prAuthorLogin: payload.pull_request.user.login,
@@ -177,12 +181,14 @@ async function extractFromIssueComment(
     );
 
     if (parent !== null) {
+      const location = buildLocation(parent);
+
       return {
-        type: "structured",
+        type: location === null ? "freeform" : "structured",
         repo: repository.full_name,
         defaultBranch: repository.default_branch,
         suggestion: buildSuggestion(parent),
-        location: buildLocation(parent),
+        location,
         pr,
         deferred_by: getUserLogin(comment.user),
         prAuthorLogin: prData.user.login,
@@ -246,8 +252,12 @@ function buildLocation(comment: {
   line: number | null;
   original_line: number | null;
   original_commit_id: string;
-}): GlossLocation {
-  const line = comment.original_line ?? comment.line ?? 0;
+}): GlossLocation | null {
+  const line = comment.original_line ?? comment.line;
+
+  if (line === null) {
+    return null;
+  }
 
   return {
     path: comment.path,

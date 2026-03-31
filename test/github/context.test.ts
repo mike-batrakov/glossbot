@@ -114,6 +114,45 @@ describe("extractContext", () => {
     expect(ctx.suggestion.author_type).toBe("human");
   });
 
+  it("treats standalone review comments without line metadata as freeform", async () => {
+    const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
+    const payload = {
+      comment: {
+        id: 301,
+        body: "@gloss track needs follow-up",
+        user: { login: "mbatrakov", type: "User" },
+        path: "src/cache.ts",
+        line: null,
+        original_line: null,
+        original_commit_id: "abc123",
+        html_url: "https://github.com/o/r/pull/1#discussion_r301",
+      },
+      pull_request: {
+        number: 1,
+        title: "Add cache",
+        html_url: "https://github.com/o/r/pull/1",
+        user: { login: "author" },
+      },
+      repository: {
+        owner: { login: "o" },
+        name: "r",
+        full_name: "o/r",
+        default_branch: "main",
+      },
+    };
+
+    const ctx = await extractContext(
+      octokit as never,
+      "pull_request_review_comment",
+      payload,
+    );
+
+    expect(ctx.type).toBe("freeform");
+    expect(ctx.location).toBeNull();
+    expect(ctx.usesOwnCommentAsSuggestion).toBe(true);
+    expect(ctx.suggestion.body).toBe("needs follow-up");
+  });
+
   it("falls back to freeform when issue comment parent lookup fails", async () => {
     const octokit = {
       rest: {
@@ -158,6 +197,62 @@ describe("extractContext", () => {
     expect(ctx.usesOwnCommentAsSuggestion).toBe(true);
     expect(ctx.location).toBeNull();
     expect(ctx.suggestion.body).toBe("some context");
+  });
+
+  it("treats parent comments without line metadata as freeform", async () => {
+    const octokit = {
+      rest: {
+        pulls: {
+          getReviewComment: vi.fn().mockResolvedValue({
+            data: {
+              body: "Consider revisiting this flow",
+              user: { login: "reviewer", type: "User" },
+              html_url: "https://github.com/o/r/pull/1#discussion_r777",
+              path: "src/auth.ts",
+              line: null,
+              original_line: null,
+              original_commit_id: "def456",
+            },
+          }),
+        },
+      },
+    };
+    const payload = {
+      comment: {
+        id: 777,
+        body: "@gloss track",
+        user: { login: "mbatrakov", type: "User" },
+        html_url: "https://github.com/o/r/pull/1#issuecomment-777",
+        in_reply_to_id: 123,
+      },
+      issue: {
+        number: 1,
+        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
+      },
+      repository: {
+        owner: { login: "o" },
+        name: "r",
+        full_name: "o/r",
+        default_branch: "main",
+      },
+    };
+    const prData = {
+      title: "PR",
+      html_url: "https://github.com/o/r/pull/1",
+      user: { login: "author" },
+    };
+
+    const ctx = await extractContext(
+      octokit as never,
+      "issue_comment",
+      payload,
+      prData,
+    );
+
+    expect(ctx.type).toBe("freeform");
+    expect(ctx.location).toBeNull();
+    expect(ctx.usesOwnCommentAsSuggestion).toBe(false);
+    expect(ctx.suggestion.body).toBe("Consider revisiting this flow");
   });
 
   it("rethrows non-404 parent lookup failures", async () => {
