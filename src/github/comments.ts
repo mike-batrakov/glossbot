@@ -8,6 +8,7 @@ export interface ReplyInput {
   id: string;
   path: string | null;
   startLine: number | null;
+  endLine: number | null;
   severity: Severity;
   tags: string[];
   deferredBy: string;
@@ -18,10 +19,10 @@ export interface ReplyInput {
 export function formatReply(input: ReplyInput): string {
   const location =
     input.type === "structured" && input.path !== null && input.startLine !== null
-      ? formatCode(`${input.path}:${input.startLine}`)
+      ? formatCode(formatLocation(input.path, input.startLine, input.endLine))
       : "(freeform)";
   const tags =
-    input.tags.length > 0 ? input.tags.map(escapeMarkdown).join(", ") : "none";
+    input.tags.length > 0 ? input.tags.map(renderTag).join(", ") : "none";
 
   const lines = [
     `Tracked ${location} · ${input.id}`,
@@ -65,8 +66,20 @@ export async function postReply(
   });
 }
 
-function escapeMarkdown(value: string): string {
-  return value.replace(/([\\`*_[\]()!#+\->])/g, "\\$1");
+function formatLocation(
+  path: string,
+  startLine: number,
+  endLine: number | null,
+): string {
+  if (endLine === null || endLine === startLine) {
+    return `${path}:${startLine}`;
+  }
+
+  return `${path}:${startLine}-${endLine}`;
+}
+
+function renderTag(value: string): string {
+  return formatCode(value);
 }
 
 function formatCode(value: string): string {

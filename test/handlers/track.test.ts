@@ -152,7 +152,7 @@ describe("handleTrack", () => {
     const replyBody =
       context.octokit.rest.issues.createComment.mock.calls[0][0].body;
     expect(replyBody).toContain("Tracked (freeform)");
-    expect(replyBody).toContain("severity: high · tags: v2");
+    expect(replyBody).toContain("severity: high · tags: `v2`");
   });
 
   it("does not store the raw command prefix for standalone override-only comments", async () => {
@@ -261,6 +261,47 @@ describe("handleTrack", () => {
       context.octokit.rest.issues.createComment.mock.calls[0][0].body;
     expect(replyBody).toContain(
       "Failed to track - concurrent write conflict. Please try again.",
+    );
+  });
+
+  it("does not post a failure reply when only the confirmation comment fails", async () => {
+    const payload = {
+      comment: {
+        id: 550,
+        body: "@gloss track refactor auth module",
+        user: { login: "mbatrakov", type: "User" },
+        html_url: "https://github.com/o/r/pull/1#issuecomment-550",
+      },
+      issue: {
+        number: 1,
+        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
+      },
+      repository: {
+        owner: { login: "o" },
+        name: "r",
+        full_name: "o/r",
+        default_branch: "main",
+      },
+    };
+    const context = createMockContext("issue_comment", payload);
+
+    context.octokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
+    context.octokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({});
+    context.octokit.rest.issues.createComment.mockRejectedValue(
+      new Error("comment API unavailable"),
+    );
+
+    await handleTrack(context as never, "issue_comment");
+
+    expect(
+      context.octokit.rest.repos.createOrUpdateFileContents,
+    ).toHaveBeenCalledTimes(1);
+    expect(context.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(context.log.info).toHaveBeenCalledWith(
+      expect.stringContaining("Tracked"),
+    );
+    expect(context.log.error).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to post confirmation reply"),
     );
   });
 });

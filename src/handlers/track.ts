@@ -97,50 +97,56 @@ export async function handleTrack(
       tags: parsed.tags,
       note,
     });
-
-    await appendToGlosslog(
-      octokit,
-      owner,
-      repo,
-      extracted.defaultBranch,
-      JSON.stringify(entry),
-      buildCommitMessage(entry.id, extracted.location),
-      createMetadataLine(extracted.repo),
-    );
-
-    await postReply(
-      octokit,
-      owner,
-      repo,
-      issueNumber,
-      formatReply({
-        type: extracted.type,
-        id: entry.id,
-        path: extracted.location?.path ?? null,
-        startLine: extracted.location?.start_line ?? null,
-        severity: entry.severity,
-        tags: entry.tags,
-        deferredBy: entry.deferred_by,
-        prNumber: extracted.pr.number,
-        invalidOverrides: parsed.invalidOverrides,
-      }),
-    );
-
-    context.log.info(`Tracked ${entry.id} in ${extracted.repo}`);
-  } catch (error) {
-    context.log.error(`Failed to track entry: ${String(error)}`);
+    const replyBody = formatReply({
+      type: extracted.type,
+      id: entry.id,
+      path: extracted.location?.path ?? null,
+      startLine: extracted.location?.start_line ?? null,
+      endLine: extracted.location?.end_line ?? null,
+      severity: entry.severity,
+      tags: entry.tags,
+      deferredBy: entry.deferred_by,
+      prNumber: extracted.pr.number,
+      invalidOverrides: parsed.invalidOverrides,
+    });
 
     try {
-      await postReply(
+      await appendToGlosslog(
+        octokit,
+        owner,
+        repo,
+        extracted.defaultBranch,
+        JSON.stringify(entry),
+        buildCommitMessage(entry.id, extracted.location),
+        createMetadataLine(extracted.repo),
+      );
+      context.log.info(`Tracked ${entry.id} in ${extracted.repo}`);
+    } catch (error) {
+      await postTrackingFailureReply(
+        context,
         octokit,
         owner,
         repo,
         issueNumber,
-        buildErrorReply(error),
+        error,
       );
-    } catch (replyError) {
-      context.log.error(`Failed to post error reply: ${String(replyError)}`);
+      return;
     }
+
+    try {
+      await postReply(octokit, owner, repo, issueNumber, replyBody);
+    } catch (error) {
+      context.log.error(`Failed to post confirmation reply: ${String(error)}`);
+    }
+  } catch (error) {
+    await postTrackingFailureReply(
+      context,
+      octokit,
+      owner,
+      repo,
+      issueNumber,
+      error,
+    );
   }
 }
 
@@ -220,4 +226,21 @@ function buildErrorReply(error: unknown): string {
   }
 
   return "Failed to track - an unexpected error occurred. Please try again.";
+}
+
+async function postTrackingFailureReply(
+  context: TrackContext,
+  octokit: GitHubClient,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  error: unknown,
+): Promise<void> {
+  context.log.error(`Failed to track entry: ${String(error)}`);
+
+  try {
+    await postReply(octokit, owner, repo, issueNumber, buildErrorReply(error));
+  } catch (replyError) {
+    context.log.error(`Failed to post error reply: ${String(replyError)}`);
+  }
 }
