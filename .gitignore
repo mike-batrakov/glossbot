@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 .claude/
 docs/superpowers/
 CLAUDE.md
+
+# Local-only planning & progress (public repo — not committed)
+private/
