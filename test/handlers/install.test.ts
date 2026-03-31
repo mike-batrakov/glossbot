@@ -13,7 +13,7 @@ function buildAccessibleRepo(overrides: Record<string, unknown> = {}) {
 
 function createMockContext(
   payloadOverrides: Record<string, unknown> = {},
-  accessibleRepos: Array<Record<string, unknown>> = [buildAccessibleRepo()],
+  accessibleRepos: Array<Record<string, unknown>> = [],
 ) {
   return {
     payload: {
@@ -26,6 +26,9 @@ function createMockContext(
       ...payloadOverrides,
     },
     octokit: {
+      paginate: {
+        iterator: vi.fn().mockReturnValue(createIssuePages()),
+      },
       rest: {
         apps: {
           listReposAccessibleToInstallation: vi.fn().mockResolvedValue({
@@ -35,7 +38,9 @@ function createMockContext(
           }),
         },
         repos: {
-          get: vi.fn(),
+          get: vi.fn().mockResolvedValue({
+            data: buildAccessibleRepo(),
+          }),
           getContent: vi.fn(),
           createOrUpdateFileContents: vi.fn(),
         },
@@ -57,6 +62,12 @@ function decodeWriteContent(content: string): string {
   return Buffer.from(content, "base64").toString("utf-8");
 }
 
+async function* createIssuePages(...pages: Array<Array<Record<string, unknown>>>) {
+  for (const page of pages) {
+    yield { data: page };
+  }
+}
+
 describe("handleInstall", () => {
   it("initializes .glosslog and workflow when both files are missing", async () => {
     const context = createMockContext();
@@ -68,12 +79,13 @@ describe("handleInstall", () => {
 
     await handleInstall(context as never);
 
+    expect(context.octokit.rest.repos.get).toHaveBeenCalledWith({
+      owner: "o",
+      repo: "r",
+    });
     expect(
       context.octokit.rest.apps.listReposAccessibleToInstallation,
-    ).toHaveBeenCalledWith({
-      page: 1,
-      per_page: 100,
-    });
+    ).not.toHaveBeenCalled();
     expect(context.octokit.rest.repos.getContent).toHaveBeenNthCalledWith(1, {
       owner: "o",
       repo: "r",
@@ -199,23 +211,23 @@ describe("handleInstall", () => {
     context.octokit.rest.repos.getContent
       .mockRejectedValueOnce({ status: 403 })
       .mockRejectedValueOnce({ status: 403 });
-    context.octokit.rest.issues.listForRepo.mockResolvedValue({
-      data: [
-        {
-          title: "GlossBot setup requires default-branch write access",
-        },
-      ],
-    });
+    context.octokit.paginate.iterator.mockReturnValue(
+      createIssuePages(
+        [{ title: "Different issue" }],
+        [{ title: "GlossBot setup requires default-branch write access" }],
+      ),
+    );
 
     await handleInstall(context as never);
 
+    expect(context.octokit.paginate.iterator).toHaveBeenCalled();
     expect(context.octokit.rest.issues.create).not.toHaveBeenCalled();
   });
 
   it("falls back to installation-accessible repositories when payload repositories are omitted", async () => {
     const context = createMockContext({
       repositories: undefined,
-    });
+    }, [buildAccessibleRepo()]);
 
     context.octokit.rest.repos.getContent
       .mockRejectedValueOnce({ status: 404 })
@@ -227,6 +239,38 @@ describe("handleInstall", () => {
     expect(
       context.octokit.rest.apps.listReposAccessibleToInstallation,
     ).toHaveBeenCalled();
+    expect(context.octokit.rest.repos.get).not.toHaveBeenCalled();
+    expect(
+      context.octokit.rest.repos.createOrUpdateFileContents,
+    ).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses repositories_added without falling back to accessible repositories", async () => {
+    const context = createMockContext(
+      {
+        repositories: undefined,
+        repositories_added: [{ name: "added", full_name: "o/added" }],
+      },
+      [buildAccessibleRepo({ name: "fallback", full_name: "o/fallback" })],
+    );
+
+    context.octokit.rest.repos.get.mockResolvedValue({
+      data: buildAccessibleRepo({ name: "added", full_name: "o/added" }),
+    });
+    context.octokit.rest.repos.getContent
+      .mockRejectedValueOnce({ status: 404 })
+      .mockRejectedValueOnce({ status: 404 });
+    context.octokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({});
+
+    await handleInstall(context as never);
+
+    expect(
+      context.octokit.rest.apps.listReposAccessibleToInstallation,
+    ).not.toHaveBeenCalled();
+    expect(context.octokit.rest.repos.get).toHaveBeenCalledWith({
+      owner: "o",
+      repo: "added",
+    });
     expect(
       context.octokit.rest.repos.createOrUpdateFileContents,
     ).toHaveBeenCalledTimes(2);

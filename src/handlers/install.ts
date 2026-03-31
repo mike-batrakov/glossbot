@@ -75,30 +75,17 @@ async function loadRepositories(
   octokit: Octokit,
   payload: InstallContext["payload"],
 ): Promise<InstallRepository[]> {
-  const accessibleRepositories = await listAccessibleRepositories(octokit);
   const requestedRepositories = payload.repositories ?? payload.repositories_added;
 
   if (requestedRepositories === undefined) {
-    return accessibleRepositories;
+    return listAccessibleRepositories(octokit);
   }
 
-  const accessibleByFullName = new Map(
-    accessibleRepositories.map((repository) => [repository.full_name, repository]),
+  return Promise.all(
+    requestedRepositories.map((repositoryRef) =>
+      loadRepository(octokit, repositoryRef),
+    ),
   );
-
-  const repositories = await Promise.all(
-    requestedRepositories.map(async (repositoryRef) => {
-      const existing = accessibleByFullName.get(repositoryRef.full_name);
-
-      if (existing !== undefined) {
-        return existing;
-      }
-
-      return loadRepository(octokit, repositoryRef);
-    }),
-  );
-
-  return repositories;
 }
 
 async function listAccessibleRepositories(octokit: Octokit): Promise<InstallRepository[]> {
@@ -231,20 +218,23 @@ async function createSetupIssue(
   repository: InstallRepository,
   failedPaths: string[],
 ): Promise<void> {
-  const existingIssues = await octokit.rest.issues.listForRepo({
-    owner: repository.owner.login,
-    repo: repository.name,
-    state: "open",
-    per_page: 100,
-  });
-
-  if (
-    existingIssues.data.some(
-      (issue) =>
-        issue.pull_request === undefined && issue.title === SETUP_ISSUE_TITLE,
-    )
-  ) {
-    return;
+  for await (const response of octokit.paginate.iterator(
+    octokit.rest.issues.listForRepo,
+    {
+      owner: repository.owner.login,
+      repo: repository.name,
+      state: "open",
+      per_page: 100,
+    },
+  )) {
+    if (
+      response.data.some(
+        (issue) =>
+          issue.pull_request === undefined && issue.title === SETUP_ISSUE_TITLE,
+      )
+    ) {
+      return;
+    }
   }
 
   await octokit.rest.issues.create({
