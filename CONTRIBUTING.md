@@ -22,6 +22,8 @@ Early contributions that are especially helpful:
 
 ## Development workflow
 
+Use a supported Node runtime locally: current Node 20 LTS (`20.18.1+`) or Node 22+.
+
 Once the application scaffold is present, the expected local workflow is:
 
 ```bash

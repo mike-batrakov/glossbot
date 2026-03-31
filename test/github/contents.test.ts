@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appendToGlosslog, readGlosslog } from "../../src/github/contents";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
@@ -45,9 +45,26 @@ describe("readGlosslog", () => {
       readGlosslog(octokit as never, "owner", "repo", "main"),
     ).rejects.toEqual({ status: 500 });
   });
+
+  it("throws when .glosslog resolves to a non-file payload", async () => {
+    const octokit = createMockOctokit();
+    octokit.rest.repos.getContent.mockResolvedValue({ data: [] });
+
+    await expect(
+      readGlosslog(octokit as never, "owner", "repo", "main"),
+    ).rejects.toThrow("Expected .glosslog to be a file with base64 content.");
+  });
 });
 
 describe("appendToGlosslog", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("appends a line to an existing file", async () => {
     const octokit = createMockOctokit();
     const existing = '{"_type":"glosslog","version":1}\n';
@@ -76,6 +93,34 @@ describe("appendToGlosslog", () => {
     const decoded = Buffer.from(putCall.content, "base64").toString("utf-8");
     expect(decoded).toBe(existing + newLine + "\n");
     expect(putCall.message).toBe("gloss: track g_12345678");
+  });
+
+  it("normalizes a missing trailing newline before appending", async () => {
+    const octokit = createMockOctokit();
+    const existing = '{"_type":"glosslog","version":1}';
+
+    octokit.rest.repos.getContent.mockResolvedValue({
+      data: {
+        content: Buffer.from(existing).toString("base64"),
+        sha: "abc123",
+      },
+    });
+    octokit.rest.repos.createOrUpdateFileContents.mockResolvedValue({});
+
+    const newLine = '{"_type":"entry","id":"g_12345678"}';
+    await appendToGlosslog(
+      octokit as never,
+      "owner",
+      "repo",
+      "main",
+      newLine,
+      "gloss: track g_12345678",
+    );
+
+    const putCall = octokit.rest.repos.createOrUpdateFileContents.mock.calls[0][0];
+    const decoded = Buffer.from(putCall.content, "base64").toString("utf-8");
+
+    expect(decoded).toBe(`${existing}\n${newLine}\n`);
   });
 
   it("creates a new file with metadata when none exists", async () => {
@@ -125,7 +170,7 @@ describe("appendToGlosslog", () => {
       .mockRejectedValueOnce({ status: 409 })
       .mockResolvedValueOnce({});
 
-    await appendToGlosslog(
+    const promise = appendToGlosslog(
       octokit as never,
       "owner",
       "repo",
@@ -133,6 +178,8 @@ describe("appendToGlosslog", () => {
       '{"_type":"entry"}',
       "msg",
     );
+    await vi.runAllTimersAsync();
+    await promise;
 
     expect(octokit.rest.repos.getContent).toHaveBeenCalledTimes(2);
     expect(octokit.rest.repos.createOrUpdateFileContents).toHaveBeenCalledTimes(2);
@@ -150,16 +197,17 @@ describe("appendToGlosslog", () => {
     });
     octokit.rest.repos.createOrUpdateFileContents.mockRejectedValue({ status: 409 });
 
-    await expect(
-      appendToGlosslog(
-        octokit as never,
-        "owner",
-        "repo",
-        "main",
-        '{"_type":"entry"}',
-        "msg",
-      ),
-    ).rejects.toEqual({ status: 409 });
+    const promise = appendToGlosslog(
+      octokit as never,
+      "owner",
+      "repo",
+      "main",
+      '{"_type":"entry"}',
+      "msg",
+    );
+    const rejection = expect(promise).rejects.toEqual({ status: 409 });
+    await vi.runAllTimersAsync();
+    await rejection;
 
     expect(octokit.rest.repos.createOrUpdateFileContents).toHaveBeenCalledTimes(3);
   });

@@ -9,6 +9,18 @@ interface FileContent {
   sha: string;
 }
 
+function isFileContentPayload(data: unknown): data is { content: string; sha: string } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    !Array.isArray(data) &&
+    "content" in data &&
+    typeof data.content === "string" &&
+    "sha" in data &&
+    typeof data.sha === "string"
+  );
+}
+
 export async function readGlosslog(
   octokit: Octokit,
   owner: string,
@@ -23,11 +35,13 @@ export async function readGlosslog(
       ref,
     });
 
-    const data = response.data as { content: string; sha: string };
+    if (!isFileContentPayload(response.data)) {
+      throw new Error(`Expected ${GLOSSLOG_PATH} to be a file with base64 content.`);
+    }
 
     return {
-      content: Buffer.from(data.content, "base64").toString("utf-8"),
-      sha: data.sha,
+      content: Buffer.from(response.data.content, "base64").toString("utf-8"),
+      sha: response.data.sha,
     };
   } catch (error: unknown) {
     if (isHttpError(error) && error.status === 404) {
@@ -50,10 +64,13 @@ export async function appendToGlosslog(
   for (let attempt = 0; attempt < MAX_PUT_ATTEMPTS; attempt += 1) {
     try {
       const existing = await readGlosslog(octokit, owner, repo, defaultBranch);
+      let nextContent = existing ? existing.content : metadataLine ?? "";
 
-      const nextContent = existing
-        ? existing.content + newLine + "\n"
-        : `${metadataLine ? `${metadataLine}\n` : ""}${newLine}\n`;
+      if (nextContent && !nextContent.endsWith("\n")) {
+        nextContent += "\n";
+      }
+
+      nextContent += `${newLine}\n`;
 
       await octokit.rest.repos.createOrUpdateFileContents({
         owner,

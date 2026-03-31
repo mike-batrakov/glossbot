@@ -16,15 +16,18 @@ const COMMAND_PATTERN = /^\s*@gloss\s+track\b/i;
 
 export function parseCommand(body: string): ParseResult | null {
   const lines = body.split("\n");
+  let insideFence = false;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    const isFenceLine = /^\s*```/.test(line);
 
-    if (isInsideFencedCodeBlock(lines, index)) {
+    if (isFenceLine) {
+      insideFence = !insideFence;
       continue;
     }
 
-    if (/^\s*>/.test(line)) {
+    if (insideFence || /^\s*>/.test(line)) {
       continue;
     }
 
@@ -86,16 +89,4 @@ function parseOverrides(text: string): ParseResult {
   result.note = noteTokens.length > 0 ? noteTokens.join(" ") : null;
 
   return result;
-}
-
-function isInsideFencedCodeBlock(lines: string[], lineIndex: number): boolean {
-  let insideFence = false;
-
-  for (let index = 0; index < lineIndex; index += 1) {
-    if (/^\s*```/.test(lines[index])) {
-      insideFence = !insideFence;
-    }
-  }
-
-  return insideFence;
 }

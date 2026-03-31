@@ -1,3 +1,5 @@
+# Pull Request
+
 ## Summary
 
 Explain why this change is needed and what it improves.
@@ -6,7 +8,8 @@ Explain why this change is needed and what it improves.
 
 - [ ] `npm run typecheck`
 - [ ] `npm run lint`
-- [ ] `npm test`
+- [ ] `npm run test:coverage`
+- [ ] `npm run build`
 - [ ] `npm run build:action` if `action/` changed
 
 ## Checklist

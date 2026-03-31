@@ -46,6 +46,8 @@ body:
         - Node.js:
         - npm:
         - GlossBot branch or commit:
+    validations:
+      required: true
   - type: textarea
     id: notes
     attributes:

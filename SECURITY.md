@@ -21,4 +21,4 @@ When reporting a vulnerability, please include:
 - impact assessment
 - any suggested remediation
 
-We will acknowledge valid reports as quickly as possible, investigate privately, and coordinate a fix before public disclosure when appropriate.
+We will acknowledge valid reports within 72 hours, investigate privately, and coordinate a fix before public disclosure when appropriate.

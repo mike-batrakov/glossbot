@@ -141,6 +141,7 @@ describe("createEntry", () => {
     const parsed = JSON.parse(json) as GlossEntry;
 
     expect(parsed._type).toBe("entry");
+    // Keep this strict so schema drift is caught immediately in tests.
     expect(Object.keys(parsed)).toHaveLength(15);
   });
 });

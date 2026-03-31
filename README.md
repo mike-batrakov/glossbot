@@ -94,10 +94,10 @@ Notes:
 - Command matching is case-insensitive.
 - `@gloss track` must appear at the start of a line.
 - Inline or fenced code blocks containing `@gloss track` are ignored.
-- `severity:` accepts: `low`, `medium`, `high`, `critical` (case-insensitive).
-- `tag:` values are case-insensitive and normalized; allowed characters are letters, numbers, `_`, and `-`.
-- Each `tag:` token should be a single value (for example `tag:tech-debt`, `tag:v2`).
-- Invalid `severity:` or `tag:` values cause command validation to fail and GlossBot replies with a user-facing error describing the invalid field.
+- `severity:` accepts: `low`, `medium`, `high`, `critical`.
+- `tag:` values are free-form single tokens and preserve whatever follows `tag:`.
+- Everything after the first colon in a tag is kept, so `tag:v2:experimental` becomes `v2:experimental`.
+- Invalid `severity:` values are surfaced as unrecognized overrides; unknown `key:value` patterns stay in the note text.
 
 ## What gets stored
 
