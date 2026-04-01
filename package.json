@@ -23,7 +23,7 @@
   "author": "Michael Batrakov",
   "license": "MIT",
   "engines": {
-    "node": "^20.18.1 || >=22"
+    "node": ">=24"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
