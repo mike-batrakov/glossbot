@@ -35,7 +35,7 @@ interface GlossEntry {
   severity: Severity;
   tags: string[];
   note: string | null;
-  status: string;
+  status: "open";
 }
 
 const SEVERITIES: readonly Severity[] = ["critical", "high", "medium", "low"];
@@ -199,7 +199,7 @@ function toGlossEntry(value: Record<string, unknown>): GlossEntry {
     severity: value.severity as Severity,
     tags: value.tags as string[],
     note: value.note as string | null,
-    status: value.status as string,
+    status: "open",
   };
 }
 

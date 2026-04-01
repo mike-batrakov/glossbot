@@ -134,7 +134,7 @@ function toGlossEntry(value) {
         severity: value.severity,
         tags: value.tags,
         note: value.note,
-        status: value.status,
+        status: "open",
     };
 }
 function isValidType(value) {

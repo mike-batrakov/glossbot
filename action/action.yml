@@ -16,6 +16,7 @@ runs:
     - name: Commit updated GLOSS.md
       shell: bash
       run: |
+        set -euo pipefail
         target_ref="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
         if [ -z "${target_ref}" ]; then
           echo "Unable to determine target ref for GLOSS.md update."
