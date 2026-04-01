@@ -1,20 +1,15 @@
-# Pull Request
-
 ## Summary
 
-Explain why this change is needed and what it improves.
+* explain why this change is needed
+* summarize the main user-facing or structural changes
+* note any follow-up work or known limitations if relevant
 
-## Testing
+## Test plan
 
-- [ ] `npm run typecheck`
-- [ ] `npm run lint`
-- [ ] `npm run test:coverage`
-- [ ] `npm run build`
-- [ ] `npm run build:action` if `action/` changed
+* `npm run typecheck`
+* `npm run lint`
+* `npm run test:coverage`
+* `npm run build`
+* `npm run build:action` if `action/` changed
 
-## Checklist
-
-- [ ] Scope is focused and intentionally small
-- [ ] Docs updated if behavior or setup changed
-- [ ] Tests added or updated where they materially reduce risk
-- [ ] No cross-imports were introduced between `src/` and `action/`
+Made with Cursor
