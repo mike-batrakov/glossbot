@@ -1,5 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractContext, inferSeverity } from "../../src/github/context";
+import {
+  extractContext,
+  inferSeverity,
+  type IssueCommentEventPayload,
+  type PullRequestData,
+  type PullRequestReviewCommentEventPayload,
+} from "../../src/github/context";
+import { loadPayloadFixture } from "../helpers/fixtures";
+
+function createReviewPayload(): PullRequestReviewCommentEventPayload {
+  return loadPayloadFixture<PullRequestReviewCommentEventPayload>(
+    "pull_request_review_comment.created",
+  );
+}
+
+function createIssuePayload(): IssueCommentEventPayload {
+  return loadPayloadFixture<IssueCommentEventPayload>("issue_comment.created");
+}
+
+function createPullRequestData(): PullRequestData {
+  return loadPayloadFixture<PullRequestData>("pull_request.data");
+}
+
+function createReviewCommentData(): Record<string, unknown> {
+  return loadPayloadFixture<Record<string, unknown>>("review_comment.data");
+}
 
 describe("extractContext", () => {
   it("uses the parent review comment for structured review replies", async () => {
@@ -7,45 +32,12 @@ describe("extractContext", () => {
       rest: {
         pulls: {
           getReviewComment: vi.fn().mockResolvedValue({
-            data: {
-              body: "Use a Map here instead",
-              user: { login: "coderabbitai[bot]", type: "Bot" },
-              html_url: "https://github.com/o/r/pull/1#discussion_r100",
-              path: "src/cache.ts",
-              line: 10,
-              original_line: 10,
-              original_commit_id: "abc123",
-            },
+            data: createReviewCommentData(),
           }),
         },
       },
     };
-
-    const payload = {
-      comment: {
-        id: 200,
-        body: "@gloss track",
-        user: { login: "mbatrakov", type: "User" },
-        in_reply_to_id: 100,
-        path: "src/cache.ts",
-        line: 10,
-        original_line: 10,
-        original_commit_id: "abc123",
-        html_url: "https://github.com/o/r/pull/1#discussion_r200",
-      },
-      pull_request: {
-        number: 1,
-        title: "Add cache",
-        html_url: "https://github.com/o/r/pull/1",
-        user: { login: "author" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createReviewPayload();
 
     const ctx = await extractContext(
       octokit as never,
@@ -74,50 +66,32 @@ describe("extractContext", () => {
   });
 
   it("preserves multi-line review comment ranges", async () => {
+    const parent = createReviewCommentData();
+    parent.body = "Split this helper into two focused functions";
+    parent.user = { login: "reviewer", type: "User" };
+    parent.html_url = "https://github.com/o/r/pull/1#discussion_r101";
+    parent.start_line = 8;
+    parent.original_start_line = 8;
+    parent.line = 12;
+    parent.original_line = 12;
+    parent.original_commit_id = "abc124";
+
     const octokit = {
       rest: {
         pulls: {
           getReviewComment: vi.fn().mockResolvedValue({
-            data: {
-              body: "Split this helper into two focused functions",
-              user: { login: "reviewer", type: "User" },
-              html_url: "https://github.com/o/r/pull/1#discussion_r101",
-              path: "src/cache.ts",
-              start_line: 8,
-              original_start_line: 8,
-              line: 12,
-              original_line: 12,
-              original_commit_id: "abc124",
-            },
+            data: parent,
           }),
         },
       },
     };
-    const payload = {
-      comment: {
-        id: 201,
-        body: "@gloss track",
-        user: { login: "mbatrakov", type: "User" },
-        in_reply_to_id: 101,
-        path: "src/cache.ts",
-        line: 12,
-        original_line: 12,
-        original_commit_id: "abc124",
-        html_url: "https://github.com/o/r/pull/1#discussion_r201",
-      },
-      pull_request: {
-        number: 1,
-        title: "Add cache",
-        html_url: "https://github.com/o/r/pull/1",
-        user: { login: "author" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createReviewPayload();
+    payload.comment.id = 201;
+    payload.comment.in_reply_to_id = 101;
+    payload.comment.line = 12;
+    payload.comment.original_line = 12;
+    payload.comment.original_commit_id = "abc124";
+    payload.comment.html_url = "https://github.com/o/r/pull/1#discussion_r201";
 
     const ctx = await extractContext(
       octokit as never,
@@ -136,29 +110,8 @@ describe("extractContext", () => {
 
   it("creates freeform context from a standalone issue comment", async () => {
     const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
-    const payload = {
-      comment: {
-        id: 300,
-        body: "@gloss track refactor auth module",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-300",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
-    const prData = {
-      title: "Auth changes",
-      html_url: "https://github.com/o/r/pull/1",
-      user: { login: "author" },
-    };
+    const payload = createIssuePayload();
+    const prData = createPullRequestData();
 
     const ctx = await extractContext(
       octokit as never,
@@ -177,30 +130,13 @@ describe("extractContext", () => {
 
   it("treats standalone review comments without line metadata as freeform", async () => {
     const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
-    const payload = {
-      comment: {
-        id: 301,
-        body: "@gloss track needs follow-up",
-        user: { login: "mbatrakov", type: "User" },
-        path: "src/cache.ts",
-        line: null,
-        original_line: null,
-        original_commit_id: "abc123",
-        html_url: "https://github.com/o/r/pull/1#discussion_r301",
-      },
-      pull_request: {
-        number: 1,
-        title: "Add cache",
-        html_url: "https://github.com/o/r/pull/1",
-        user: { login: "author" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createReviewPayload();
+    delete payload.comment.in_reply_to_id;
+    payload.comment.id = 301;
+    payload.comment.body = "@gloss track needs follow-up";
+    payload.comment.line = null;
+    payload.comment.original_line = null;
+    payload.comment.html_url = "https://github.com/o/r/pull/1#discussion_r301";
 
     const ctx = await extractContext(
       octokit as never,
@@ -222,30 +158,13 @@ describe("extractContext", () => {
         },
       },
     };
-    const payload = {
-      comment: {
-        id: 500,
-        body: "@gloss track some context",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-500",
-        in_reply_to_id: 999,
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
-    const prData = {
-      title: "PR",
-      html_url: "https://github.com/o/r/pull/1",
-      user: { login: "author" },
-    };
+    const payload = createIssuePayload();
+    payload.comment.id = 500;
+    payload.comment.body = "@gloss track some context";
+    payload.comment.html_url = "https://github.com/o/r/pull/1#issuecomment-500";
+    payload.comment.in_reply_to_id = 999;
+    const prData = createPullRequestData();
+    prData.title = "PR";
 
     const ctx = await extractContext(
       octokit as never,
@@ -261,47 +180,31 @@ describe("extractContext", () => {
   });
 
   it("treats parent comments without line metadata as freeform", async () => {
+    const parent = createReviewCommentData();
+    parent.body = "Consider revisiting this flow";
+    parent.user = { login: "reviewer", type: "User" };
+    parent.html_url = "https://github.com/o/r/pull/1#discussion_r777";
+    parent.path = "src/auth.ts";
+    parent.line = null;
+    parent.original_line = null;
+    parent.original_commit_id = "def456";
+
     const octokit = {
       rest: {
         pulls: {
           getReviewComment: vi.fn().mockResolvedValue({
-            data: {
-              body: "Consider revisiting this flow",
-              user: { login: "reviewer", type: "User" },
-              html_url: "https://github.com/o/r/pull/1#discussion_r777",
-              path: "src/auth.ts",
-              line: null,
-              original_line: null,
-              original_commit_id: "def456",
-            },
+            data: parent,
           }),
         },
       },
     };
-    const payload = {
-      comment: {
-        id: 777,
-        body: "@gloss track",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-777",
-        in_reply_to_id: 123,
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
-    const prData = {
-      title: "PR",
-      html_url: "https://github.com/o/r/pull/1",
-      user: { login: "author" },
-    };
+    const payload = createIssuePayload();
+    payload.comment.id = 777;
+    payload.comment.body = "@gloss track";
+    payload.comment.html_url = "https://github.com/o/r/pull/1#issuecomment-777";
+    payload.comment.in_reply_to_id = 123;
+    const prData = createPullRequestData();
+    prData.title = "PR";
 
     const ctx = await extractContext(
       octokit as never,
@@ -324,30 +227,13 @@ describe("extractContext", () => {
         },
       },
     };
-    const payload = {
-      comment: {
-        id: 501,
-        body: "@gloss track some context",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-501",
-        in_reply_to_id: 999,
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
-    const prData = {
-      title: "PR",
-      html_url: "https://github.com/o/r/pull/1",
-      user: { login: "author" },
-    };
+    const payload = createIssuePayload();
+    payload.comment.id = 501;
+    payload.comment.body = "@gloss track some context";
+    payload.comment.html_url = "https://github.com/o/r/pull/1#issuecomment-501";
+    payload.comment.in_reply_to_id = 999;
+    const prData = createPullRequestData();
+    prData.title = "PR";
 
     await expect(
       extractContext(octokit as never, "issue_comment", payload, prData),
@@ -356,29 +242,11 @@ describe("extractContext", () => {
 
   it("throws when the comment user login is unavailable", async () => {
     const octokit = { rest: { pulls: { getReviewComment: vi.fn() } } };
-    const payload = {
-      comment: {
-        id: 600,
-        body: "@gloss track refactor auth module",
-        user: null,
-        html_url: "https://github.com/o/r/pull/1#issuecomment-600",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
-    const prData = {
-      title: "Auth changes",
-      html_url: "https://github.com/o/r/pull/1",
-      user: { login: "author" },
-    };
+    const payload = createIssuePayload();
+    payload.comment.id = 600;
+    payload.comment.user = null;
+    payload.comment.html_url = "https://github.com/o/r/pull/1#issuecomment-600";
+    const prData = createPullRequestData();
 
     await expect(
       extractContext(octokit as never, "issue_comment", payload, prData),

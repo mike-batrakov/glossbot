@@ -1,0 +1,9 @@
+{
+  "body": "Use a Map here instead",
+  "user": { "login": "coderabbitai[bot]", "type": "Bot" },
+  "html_url": "https://github.com/o/r/pull/1#discussion_r100",
+  "path": "src/cache.ts",
+  "line": 10,
+  "original_line": 10,
+  "original_commit_id": "abc123"
+}

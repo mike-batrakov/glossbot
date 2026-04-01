@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleTrack } from "../../src/handlers/track";
+import { loadGlosslogFixture, loadPayloadFixture } from "../helpers/fixtures";
 
 function createMockContext(eventName: string, payload: Record<string, unknown>) {
   return {
@@ -34,6 +35,20 @@ function createMockContext(eventName: string, payload: Record<string, unknown>) 
   };
 }
 
+function createReviewPayload(): Record<string, unknown> {
+  return loadPayloadFixture<Record<string, unknown>>(
+    "pull_request_review_comment.created",
+  );
+}
+
+function createIssuePayload(): Record<string, unknown> {
+  return loadPayloadFixture<Record<string, unknown>>("issue_comment.created");
+}
+
+function createReviewCommentData(): Record<string, unknown> {
+  return loadPayloadFixture<Record<string, unknown>>("review_comment.data");
+}
+
 describe("handleTrack", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -44,49 +59,18 @@ describe("handleTrack", () => {
   });
 
   it("tracks a structured entry from a review comment reply", async () => {
-    const payload = {
-      comment: {
-        id: 200,
-        body: "@gloss track",
-        user: { login: "mbatrakov", type: "User" },
-        in_reply_to_id: 100,
-        path: "src/cache.ts",
-        line: 10,
-        original_line: 10,
-        original_commit_id: "abc123",
-        html_url: "https://github.com/o/r/pull/1#discussion_r200",
-      },
-      pull_request: {
-        number: 1,
-        title: "Test PR",
-        html_url: "https://github.com/o/r/pull/1",
-        user: { login: "author" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createReviewPayload();
+    (payload.pull_request as Record<string, unknown>).title = "Test PR";
     const context = createMockContext("pull_request_review_comment", payload);
+    const parentComment = createReviewCommentData();
+    parentComment.body = "Use Map instead of object";
 
     context.octokit.rest.pulls.getReviewComment.mockResolvedValue({
-      data: {
-        body: "Use Map instead of object",
-        user: { login: "coderabbitai[bot]", type: "Bot" },
-        html_url: "https://github.com/o/r/pull/1#discussion_r100",
-        path: "src/cache.ts",
-        line: 10,
-        original_line: 10,
-        original_commit_id: "abc123",
-      },
+      data: parentComment,
     });
     context.octokit.rest.repos.getContent.mockResolvedValue({
       data: {
-        content: Buffer.from('{"_type":"glosslog","version":1}\n').toString(
-          "base64",
-        ),
+        content: Buffer.from(loadGlosslogFixture("metadata-only")).toString("base64"),
         sha: "sha123",
       },
     });
@@ -113,24 +97,9 @@ describe("handleTrack", () => {
   });
 
   it("tracks a standalone issue comment as freeform without duplicating note", async () => {
-    const payload = {
-      comment: {
-        id: 300,
-        body: "@gloss track severity:high tag:v2 refactor auth module",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-300",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createIssuePayload();
+    (payload.comment as Record<string, unknown>).body =
+      "@gloss track severity:high tag:v2 refactor auth module";
     const context = createMockContext("issue_comment", payload);
 
     context.octokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
@@ -156,24 +125,12 @@ describe("handleTrack", () => {
   });
 
   it("does not store the raw command prefix for standalone override-only comments", async () => {
-    const payload = {
-      comment: {
-        id: 350,
-        body: "@gloss track severity:high tag:v2",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-350",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createIssuePayload();
+    (payload.comment as Record<string, unknown>).id = 350;
+    (payload.comment as Record<string, unknown>).body =
+      "@gloss track severity:high tag:v2";
+    (payload.comment as Record<string, unknown>).html_url =
+      "https://github.com/o/r/pull/1#issuecomment-350";
     const context = createMockContext("issue_comment", payload);
 
     context.octokit.rest.repos.getContent.mockRejectedValue({ status: 404 });
@@ -191,24 +148,11 @@ describe("handleTrack", () => {
   });
 
   it("ignores comments without the command", async () => {
-    const payload = {
-      comment: {
-        id: 400,
-        body: "Looks good to me",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-400",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createIssuePayload();
+    (payload.comment as Record<string, unknown>).id = 400;
+    (payload.comment as Record<string, unknown>).body = "Looks good to me";
+    (payload.comment as Record<string, unknown>).html_url =
+      "https://github.com/o/r/pull/1#issuecomment-400";
     const context = createMockContext("issue_comment", payload);
 
     await handleTrack(context as never, "issue_comment");
@@ -220,31 +164,17 @@ describe("handleTrack", () => {
   });
 
   it("posts a clear error reply when repeated conflicts exhaust retries", async () => {
-    const payload = {
-      comment: {
-        id: 500,
-        body: "@gloss track some context",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-500",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createIssuePayload();
+    (payload.comment as Record<string, unknown>).id = 500;
+    (payload.comment as Record<string, unknown>).body =
+      "@gloss track some context";
+    (payload.comment as Record<string, unknown>).html_url =
+      "https://github.com/o/r/pull/1#issuecomment-500";
     const context = createMockContext("issue_comment", payload);
 
     context.octokit.rest.repos.getContent.mockResolvedValue({
       data: {
-        content: Buffer.from('{"_type":"glosslog","version":1}\n').toString(
-          "base64",
-        ),
+        content: Buffer.from(loadGlosslogFixture("metadata-only")).toString("base64"),
         sha: "sha123",
       },
     });
@@ -265,24 +195,10 @@ describe("handleTrack", () => {
   });
 
   it("does not post a failure reply when only the confirmation comment fails", async () => {
-    const payload = {
-      comment: {
-        id: 550,
-        body: "@gloss track refactor auth module",
-        user: { login: "mbatrakov", type: "User" },
-        html_url: "https://github.com/o/r/pull/1#issuecomment-550",
-      },
-      issue: {
-        number: 1,
-        pull_request: { url: "https://api.github.com/repos/o/r/pulls/1" },
-      },
-      repository: {
-        owner: { login: "o" },
-        name: "r",
-        full_name: "o/r",
-        default_branch: "main",
-      },
-    };
+    const payload = createIssuePayload();
+    (payload.comment as Record<string, unknown>).id = 550;
+    (payload.comment as Record<string, unknown>).html_url =
+      "https://github.com/o/r/pull/1#issuecomment-550";
     const context = createMockContext("issue_comment", payload);
 
     context.octokit.rest.repos.getContent.mockRejectedValue({ status: 404 });

@@ -1,0 +1,18 @@
+{
+  "comment": {
+    "id": 300,
+    "body": "@gloss track refactor auth module",
+    "user": { "login": "mbatrakov", "type": "User" },
+    "html_url": "https://github.com/o/r/pull/1#issuecomment-300"
+  },
+  "issue": {
+    "number": 1,
+    "pull_request": { "url": "https://api.github.com/repos/o/r/pulls/1" }
+  },
+  "repository": {
+    "owner": { "login": "o" },
+    "name": "r",
+    "full_name": "o/r",
+    "default_branch": "main"
+  }
+}

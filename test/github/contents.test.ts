@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appendToGlosslog, readGlosslog } from "../../src/github/contents";
+import { loadGlosslogFixture } from "../helpers/fixtures";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
   return {
@@ -16,7 +17,7 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 describe("readGlosslog", () => {
   it("returns decoded content and sha when file exists", async () => {
     const octokit = createMockOctokit();
-    const content = '{"_type":"glosslog","version":1}\n';
+    const content = loadGlosslogFixture("metadata-only");
 
     octokit.rest.repos.getContent.mockResolvedValue({
       data: {
@@ -67,7 +68,7 @@ describe("appendToGlosslog", () => {
 
   it("appends a line to an existing file", async () => {
     const octokit = createMockOctokit();
-    const existing = '{"_type":"glosslog","version":1}\n';
+    const existing = loadGlosslogFixture("metadata-only");
 
     octokit.rest.repos.getContent.mockResolvedValue({
       data: {
@@ -179,7 +180,7 @@ describe("appendToGlosslog", () => {
 
   it("retries on 409 conflict", async () => {
     const octokit = createMockOctokit();
-    const content = '{"_type":"glosslog"}\n';
+    const content = loadGlosslogFixture("metadata-only");
 
     octokit.rest.repos.getContent
       .mockResolvedValueOnce({
@@ -216,7 +217,7 @@ describe("appendToGlosslog", () => {
 
   it("throws after max retries on repeated 409 conflicts", async () => {
     const octokit = createMockOctokit();
-    const content = '{"_type":"glosslog"}\n';
+    const content = loadGlosslogFixture("metadata-only");
 
     octokit.rest.repos.getContent.mockResolvedValue({
       data: {
