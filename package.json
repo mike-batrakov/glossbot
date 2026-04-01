@@ -11,8 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src test --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src test action --ext .ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.action.json --noEmit"
   },
   "keywords": [
     "github-app",

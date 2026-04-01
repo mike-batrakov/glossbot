@@ -1,0 +1,29 @@
+name: Generate GLOSS.md
+description: Render GLOSS.md from .glosslog and commit it when changed.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Generate GLOSS.md
+      shell: bash
+      run: node "${{ github.action_path }}/dist/generate.js"
+
+    - name: Commit updated GLOSS.md
+      shell: bash
+      run: |
+        target_ref="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+        git add GLOSS.md
+        if git diff --cached --quiet -- GLOSS.md; then
+          echo "No GLOSS.md changes to commit."
+          exit 0
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git commit -m "gloss: update GLOSS.md"
+        git push origin "HEAD:${target_ref}"
