@@ -91,6 +91,29 @@ describe("generateGlossMd", () => {
     expect(markdown).not.toContain("this is not json");
   });
 
+  it("keeps multiline suggestion and note content inside markdown containers", () => {
+    const markdown = generateGlossMd(`{"_type":"glosslog","version":1,"repo":"octo-org/example-repo","initialized_at":"2026-04-01T09:00:00Z"}
+{"_type":"entry","id":"g_multi001","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-04-01T10:00:00Z","source":"github-pr","suggestion":{"body":"Line one\\n### escaped heading","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/19#discussion_r1"},"location":{"path":"src/multi.ts","start_line":3,"end_line":4,"original_commit_sha":"abc999"},"pr":{"number":19,"title":"Multiline","url":"https://github.com/octo-org/example-repo/pull/19"},"deferred_by":"mbatrakov","severity":"medium","tags":[],"note":"first note line\\n- still quoted","status":"open"}
+{"_type":"entry","id":"g_multi002","version":1,"type":"freeform","repo":"octo-org/example-repo","created_at":"2026-04-01T11:00:00Z","source":"github-pr","suggestion":{"body":"Freeform line one\\nsecond line","author":"teammate","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/20#issuecomment-1"},"location":null,"pr":{"number":20,"title":"Freeform multiline","url":"https://github.com/octo-org/example-repo/pull/20"},"deferred_by":"mbatrakov","severity":"high","tags":[],"note":"note line one\\nnote line two","status":"open"}
+`);
+
+    expect(markdown).toContain("> Line one\n> ### escaped heading");
+    expect(markdown).toContain("> **Note:** first note line\n> - still quoted");
+    expect(markdown).toContain('- **g_multi002** · "Freeform line one\n  second line"');
+    expect(markdown).toContain("  > **Note:** note line one\n  > note line two");
+  });
+
+  it("orders entries by actual timestamp when created_at formats sort lexically differently", () => {
+    const markdown = generateGlossMd(`{"_type":"glosslog","version":1,"repo":"octo-org/example-repo","initialized_at":"2026-04-01T09:00:00Z"}
+{"_type":"entry","id":"g_time002","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-04-01T00:30:00+02:00","source":"github-pr","suggestion":{"body":"Later lexical, earlier actual time","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/21#discussion_r2"},"location":{"path":"src/time.ts","start_line":5,"end_line":5,"original_commit_sha":"time002"},"pr":{"number":21,"title":"Time order","url":"https://github.com/octo-org/example-repo/pull/21"},"deferred_by":"mbatrakov","severity":"high","tags":[],"note":null,"status":"open"}
+{"_type":"entry","id":"g_time001","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-03-31T23:45:00Z","source":"github-pr","suggestion":{"body":"Earlier lexical, later actual time","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/21#discussion_r1"},"location":{"path":"src/time.ts","start_line":5,"end_line":5,"original_commit_sha":"time001"},"pr":{"number":21,"title":"Time order","url":"https://github.com/octo-org/example-repo/pull/21"},"deferred_by":"mbatrakov","severity":"high","tags":[],"note":null,"status":"open"}
+`);
+
+    const first = indexOfOrThrow(markdown, "g_time002");
+    const second = indexOfOrThrow(markdown, "g_time001");
+    expect(first).toBeLessThan(second);
+  });
+
   it("writes GLOSS.md from glosslog and output file paths", () => {
     const tempDir = mkdtempSync(path.join(tmpdir(), "glossbot-action-"));
     const glosslogPath = path.join(tempDir, ".glosslog");

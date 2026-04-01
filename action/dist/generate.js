@@ -181,14 +181,14 @@ function compareStructuredEntries(left, right) {
     if (startCompare !== 0) {
         return startCompare;
     }
-    const createdCompare = left.created_at.localeCompare(right.created_at);
+    const createdCompare = compareIsoDates(left.created_at, right.created_at);
     if (createdCompare !== 0) {
         return createdCompare;
     }
     return left.id.localeCompare(right.id);
 }
 function compareFreeformEntries(left, right) {
-    const createdCompare = left.created_at.localeCompare(right.created_at);
+    const createdCompare = compareIsoDates(left.created_at, right.created_at);
     if (createdCompare !== 0) {
         return createdCompare;
     }
@@ -227,11 +227,11 @@ function formatLatestDate(entries) {
 function renderStructuredEntry(entry) {
     const parts = [
         `### \`${formatLocation(entry.location)}\` · ${entry.id}`,
-        `> ${entry.suggestion.body}`,
+        formatBlockQuote(entry.suggestion.body),
         `— *${entry.suggestion.author}* on [PR #${entry.pr.number}](${entry.pr.url}) · deferred by @${entry.deferred_by} · ${entry.created_at.slice(0, 10)}`,
     ];
     if (entry.note !== null) {
-        parts.push(`> **Note:** ${entry.note}`);
+        parts.push(formatPrefixedMultiline(entry.note, "> **Note:** ", "> "));
     }
     if (entry.tags.length > 0) {
         parts.push(`> **Tags:** ${entry.tags.join(", ")}`);
@@ -240,11 +240,11 @@ function renderStructuredEntry(entry) {
 }
 function renderFreeformEntry(entry) {
     const parts = [
-        `- **${entry.id}** · "${entry.suggestion.body}"`,
+        formatFreeformBody(entry.id, entry.suggestion.body),
         `  — *${entry.suggestion.author}* on [PR #${entry.pr.number}](${entry.pr.url}) · deferred by @${entry.deferred_by} · ${entry.created_at.slice(0, 10)}`,
     ];
     if (entry.note !== null) {
-        parts.push(`  > **Note:** ${entry.note}`);
+        parts.push(formatPrefixedMultiline(entry.note, "  > **Note:** ", "  > "));
     }
     if (entry.tags.length > 0) {
         parts.push(`  > **Tags:** ${entry.tags.join(", ")}`);
@@ -262,6 +262,24 @@ function capitalize(value) {
 }
 function compareIsoDates(left, right) {
     return Date.parse(left) - Date.parse(right);
+}
+function formatBlockQuote(value) {
+    return formatPrefixedMultiline(value, "> ", "> ");
+}
+function formatFreeformBody(id, value) {
+    return formatPrefixedMultiline(value, `- **${id}** · "`, "  ", '"');
+}
+function formatPrefixedMultiline(value, firstLinePrefix, nextLinePrefix, suffix = "") {
+    const [firstLine = "", ...rest] = normalizeMultiline(value);
+    const lines = [`${firstLinePrefix}${firstLine}`];
+    for (const line of rest) {
+        lines.push(`${nextLinePrefix}${line}`);
+    }
+    lines[lines.length - 1] += suffix;
+    return lines.join("\n");
+}
+function normalizeMultiline(value) {
+    return value.replace(/\r\n/g, "\n").split("\n");
 }
 function writeGlossMdFiles(paths = {}) {
     const glosslogPath = paths.glosslogPath ?? GLOSSLOG_PATH;

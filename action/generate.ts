@@ -263,7 +263,7 @@ function compareStructuredEntries(left: GlossEntry, right: GlossEntry): number {
     return startCompare;
   }
 
-  const createdCompare = left.created_at.localeCompare(right.created_at);
+  const createdCompare = compareIsoDates(left.created_at, right.created_at);
   if (createdCompare !== 0) {
     return createdCompare;
   }
@@ -272,7 +272,7 @@ function compareStructuredEntries(left: GlossEntry, right: GlossEntry): number {
 }
 
 function compareFreeformEntries(left: GlossEntry, right: GlossEntry): number {
-  const createdCompare = left.created_at.localeCompare(right.created_at);
+  const createdCompare = compareIsoDates(left.created_at, right.created_at);
   if (createdCompare !== 0) {
     return createdCompare;
   }
@@ -321,12 +321,12 @@ function formatLatestDate(entries: GlossEntry[]): string {
 function renderStructuredEntry(entry: GlossEntry & { location: GlossLocation }): string {
   const parts = [
     `### \`${formatLocation(entry.location)}\` · ${entry.id}`,
-    `> ${entry.suggestion.body}`,
+    formatBlockQuote(entry.suggestion.body),
     `— *${entry.suggestion.author}* on [PR #${entry.pr.number}](${entry.pr.url}) · deferred by @${entry.deferred_by} · ${entry.created_at.slice(0, 10)}`,
   ];
 
   if (entry.note !== null) {
-    parts.push(`> **Note:** ${entry.note}`);
+    parts.push(formatPrefixedMultiline(entry.note, "> **Note:** ", "> "));
   }
 
   if (entry.tags.length > 0) {
@@ -338,12 +338,12 @@ function renderStructuredEntry(entry: GlossEntry & { location: GlossLocation }):
 
 function renderFreeformEntry(entry: GlossEntry): string {
   const parts = [
-    `- **${entry.id}** · "${entry.suggestion.body}"`,
+    formatFreeformBody(entry.id, entry.suggestion.body),
     `  — *${entry.suggestion.author}* on [PR #${entry.pr.number}](${entry.pr.url}) · deferred by @${entry.deferred_by} · ${entry.created_at.slice(0, 10)}`,
   ];
 
   if (entry.note !== null) {
-    parts.push(`  > **Note:** ${entry.note}`);
+    parts.push(formatPrefixedMultiline(entry.note, "  > **Note:** ", "  > "));
   }
 
   if (entry.tags.length > 0) {
@@ -367,6 +367,35 @@ function capitalize(value: string): string {
 
 function compareIsoDates(left: string, right: string): number {
   return Date.parse(left) - Date.parse(right);
+}
+
+function formatBlockQuote(value: string): string {
+  return formatPrefixedMultiline(value, "> ", "> ");
+}
+
+function formatFreeformBody(id: string, value: string): string {
+  return formatPrefixedMultiline(value, `- **${id}** · "`, "  ", '"');
+}
+
+function formatPrefixedMultiline(
+  value: string,
+  firstLinePrefix: string,
+  nextLinePrefix: string,
+  suffix = "",
+): string {
+  const [firstLine = "", ...rest] = normalizeMultiline(value);
+  const lines = [`${firstLinePrefix}${firstLine}`];
+
+  for (const line of rest) {
+    lines.push(`${nextLinePrefix}${line}`);
+  }
+
+  lines[lines.length - 1] += suffix;
+  return lines.join("\n");
+}
+
+function normalizeMultiline(value: string): string[] {
+  return value.replace(/\r\n/g, "\n").split("\n");
 }
 
 export function writeGlossMdFiles(paths: {

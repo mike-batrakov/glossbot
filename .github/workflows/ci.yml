@@ -36,7 +36,7 @@ jobs:
       - name: Verify committed action bundle
         run: |
           if [ -n "$(git status --porcelain -- action/dist)" ]; then
-            echo "Committed action bundle is out of date."
+            echo "Committed action bundle is out of date. Regenerate with npm run build:action (or the repo build command) and commit action/dist."
             git status --short -- action/dist
             exit 1
           fi
