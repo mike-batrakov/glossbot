@@ -33,18 +33,18 @@ This separation keeps webhook handling stateless and makes report generation eas
 
 ## Current status
 
-GlossBot is public in the open and actively being built, but it is not install-ready yet.
+GlossBot is public in the open and now has its core v1 implementation in this repository, but it is not fully install-ready for external users yet.
 
 - The v1 design is approved.
-- The public repo foundation is being set up now.
-- The GitHub App and companion Action have not been published yet.
-- Early contributors are welcome, especially on docs, repo hygiene, tests, and implementation scaffolding.
+- The GitHub App runtime and companion Action implementation both live in this repo.
+- Publishing the GitHub App setup flow and `glossbot/generate-gloss-md@v1` remains a separate release step.
+- Early contributors are welcome, especially on focused bugs, tests, docs, and release-readiness polish.
 
-If you are visiting this repository looking for a production-ready GitHub App to install today, check back after the first public implementation milestone lands.
+If you are visiting this repository looking for a production-ready GitHub App to install today, check back after the first public release milestone lands.
 
 ## Planned Setup / Installation
 
-These steps describe the intended install flow after the first public implementation milestone. They are not actionable yet on this branch.
+These steps describe the intended public install flow. The repository now contains the core implementation, but the published GitHub App setup and external `glossbot/generate-gloss-md@v1` release are still separate follow-up work.
 
 ### 1) Install GlossBot (GitHub App)
 
@@ -124,27 +124,29 @@ Concrete `.glosslog` JSON Lines example:
 
 ## Project status
 
-GlossBot is currently in **early v1 implementation**.
+GlossBot is currently in **late v1 implementation**.
 
 - ✅ Design approved
-- 🚧 Public repo foundation in progress
-- 🚧 Core implementation not merged yet
-- 🎯 Scope focused on tracking deferred PR suggestions and generating `GLOSS.md`
+- ✅ Core GitHub App implementation in repo
+- ✅ Companion `action/` implementation in repo
+- 🚧 Publish / release work still pending
+- 🎯 Scope remains focused on tracking deferred PR suggestions and generating `GLOSS.md`
 
 ## First public implementation milestone
 
-This branch establishes the first public implementation slice:
+This repository now contains the first full public implementation slice:
 
 - A TypeScript/Probot app scaffold under `src/`
-- Initial schema, parser, and GitHub Contents API primitives
+- Schema, parser, GitHub API, handlers, and install flow
+- The companion Action implementation under `action/`
 - Tests, CI, contributor setup, and repository templates
-- The foundation for the `.glosslog` schema and `GLOSS.md` generation flow described above
+- The `.glosslog` schema and `GLOSS.md` generation flow described above
 
 Still to come:
 
-- Full webhook handlers and end-to-end bot behavior
-- The composite GitHub Action implementation under `action/`
-- Install-ready GitHub App configuration and published action release
+- GitHub App registration / deployment guidance for end users
+- Published `glossbot/generate-gloss-md@v1` release and verification
+- Final install-ready release polish
 
 ## Public roadmap (high-level)
 
@@ -161,9 +163,9 @@ Contributions are welcome.
 Right now, the highest-value contributions are:
 
 - documentation clarity
-- public repo setup
-- implementation scaffolding
-- tests and CI once the codebase lands
+- release-readiness and install flow polish
+- focused bug fixes
+- tests and CI hardening
 
 A fuller contributor setup guide will live in `CONTRIBUTING.md`.
 

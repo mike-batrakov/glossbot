@@ -14,6 +14,10 @@ const PAYLOAD_FIXTURES = {
 } as const;
 const GLOSSLOG_FIXTURES = {
   "metadata-only": path.join("glosslog", "metadata-only.jsonl"),
+  "single-structured": path.join("glosslog", "single-structured.jsonl"),
+  "mixed-severity": path.join("glosslog", "mixed-severity.jsonl"),
+  "with-freeform": path.join("glosslog", "with-freeform.jsonl"),
+  "with-invalid-lines": path.join("glosslog", "with-invalid-lines.jsonl"),
 } as const;
 
 type PayloadFixtureName = keyof typeof PAYLOAD_FIXTURES;

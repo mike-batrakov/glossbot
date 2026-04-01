@@ -41,12 +41,12 @@ npm run build:action
 
 ## Project structure
 
-The repository is being built toward two intentionally separate parts:
+The repository has two intentionally separate parts:
 
-- `src/`: the Probot GitHub App scaffold and runtime code
-- `action/`: the future GitHub Action that will generate `GLOSS.md`
+- `src/`: the Probot GitHub App runtime code
+- `action/`: the GitHub Action that generates `GLOSS.md`
 
-The `action/` tree is planned but not implemented yet in this branch. Once it lands, do not add imports between `src/` and `action/`. That boundary is deliberate so the action can stay independently publishable.
+Do not add imports between `src/` and `action/`. That boundary is deliberate so the action can stay independently publishable. When action code changes, rebuild and commit `action/dist/` so the checked-in composite action stays runnable without a pre-build step.
 
 ## Testing expectations
 
