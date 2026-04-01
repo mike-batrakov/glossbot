@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const FIXTURE_ROOT = path.resolve(__dirname, "..", "fixtures");
+const fileCache = new Map<string, string>();
 const PAYLOAD_FIXTURES = {
   "issue_comment.created": path.join("payloads", "issue_comment.created.json"),
   "pull_request.data": path.join("payloads", "pull_request.data.json"),
@@ -27,16 +28,25 @@ export function loadGlosslogFixture(name: GlosslogFixtureName): string {
 }
 
 export function cloneFixture<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function readJsonFixture<T>(relativePath: string): T {
-  return cloneFixture(JSON.parse(readFixture(relativePath)) as T);
+  return JSON.parse(readFixture(relativePath)) as T;
 }
 
 function readFixture(relativePath: string): string {
-  return readFileSync(path.join(FIXTURE_ROOT, relativePath), "utf-8").replace(
+  const cached = fileCache.get(relativePath);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const content = readFileSync(path.join(FIXTURE_ROOT, relativePath), "utf-8").replace(
     /\r\n/g,
     "\n",
   );
+
+  fileCache.set(relativePath, content);
+  return content;
 }
