@@ -134,6 +134,7 @@ function isValidEntry(value: Record<string, unknown>): boolean {
   if (
     typeof value.id !== "string" ||
     typeof value.version !== "number" ||
+    value.version !== 1 ||
     !isValidType(value.type) ||
     typeof value.repo !== "string" ||
     typeof value.created_at !== "string" ||

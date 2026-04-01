@@ -78,6 +78,7 @@ function parseLine(line) {
 function isValidEntry(value) {
     if (typeof value.id !== "string" ||
         typeof value.version !== "number" ||
+        value.version !== 1 ||
         !isValidType(value.type) ||
         typeof value.repo !== "string" ||
         typeof value.created_at !== "string" ||

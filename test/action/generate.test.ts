@@ -91,6 +91,19 @@ describe("generateGlossMd", () => {
     expect(markdown).not.toContain("this is not json");
   });
 
+  it("skips entries with unsupported schema versions", () => {
+    const markdown = generateGlossMd(`{"_type":"glosslog","version":1,"repo":"octo-org/example-repo","initialized_at":"2026-04-01T09:00:00Z"}
+{"_type":"entry","id":"g_supported01","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-04-01T10:00:00Z","source":"github-pr","suggestion":{"body":"Supported schema entry","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/22#discussion_r1"},"location":{"path":"src/version.ts","start_line":1,"end_line":1,"original_commit_sha":"ver001"},"pr":{"number":22,"title":"Version guard","url":"https://github.com/octo-org/example-repo/pull/22"},"deferred_by":"mbatrakov","severity":"medium","tags":[],"note":null,"status":"open"}
+{"_type":"entry","id":"g_future01","version":2,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-04-01T11:00:00Z","source":"github-pr","suggestion":{"body":"Future schema entry","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/22#discussion_r2"},"location":{"path":"src/version.ts","start_line":2,"end_line":2,"original_commit_sha":"ver002"},"pr":{"number":22,"title":"Version guard","url":"https://github.com/octo-org/example-repo/pull/22"},"deferred_by":"mbatrakov","severity":"high","tags":[],"note":null,"status":"open"}
+`);
+
+    expect(markdown).toContain(
+      "**1 open items** · 0 critical · 0 high · 1 medium · 0 low · oldest: 2026-04-01",
+    );
+    expect(markdown).toContain("g_supported01");
+    expect(markdown).not.toContain("g_future01");
+  });
+
   it("keeps multiline suggestion and note content inside markdown containers", () => {
     const markdown = generateGlossMd(`{"_type":"glosslog","version":1,"repo":"octo-org/example-repo","initialized_at":"2026-04-01T09:00:00Z"}
 {"_type":"entry","id":"g_multi001","version":1,"type":"structured","repo":"octo-org/example-repo","created_at":"2026-04-01T10:00:00Z","source":"github-pr","suggestion":{"body":"Line one\\n### escaped heading","author":"reviewer","author_type":"human","url":"https://github.com/octo-org/example-repo/pull/19#discussion_r1"},"location":{"path":"src/multi.ts","start_line":3,"end_line":4,"original_commit_sha":"abc999"},"pr":{"number":19,"title":"Multiline","url":"https://github.com/octo-org/example-repo/pull/19"},"deferred_by":"mbatrakov","severity":"medium","tags":[],"note":"first note line\\n- still quoted","status":"open"}
