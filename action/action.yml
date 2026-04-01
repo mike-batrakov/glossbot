@@ -1,5 +1,5 @@
 name: Generate GLOSS.md
-description: Render GLOSS.md from .glosslog and commit it when changed.
+description: "Render GLOSS.md from .glosslog and commit it when changed; callers must grant GITHUB_TOKEN permissions: contents: write so the action can push updates."
 
 runs:
   using: composite
